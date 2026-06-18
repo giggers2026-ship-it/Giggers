@@ -1,0 +1,76 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AppShell } from './components/layout/AppShell';
+
+// Landing
+import Landing from './features/landing/pages/Landing';
+
+// Auth
+import Welcome from './features/auth/pages/Welcome';
+import Login from './features/auth/pages/Login';
+import Register from './features/auth/pages/Register';
+import OtpVerify from './features/auth/pages/OtpVerify';
+import ForgotPassword from './features/auth/pages/ForgotPassword';
+
+// Home
+import Home from './features/home/pages/Home';
+
+// Jobs
+import Jobs from './features/jobs/pages/Jobs';
+import JobDetails from './features/jobs/pages/JobDetails';
+import PostJob from './features/jobs/pages/PostJob';
+
+// Profile
+import Profile from './features/profile/pages/Profile';
+
+// Chat
+import ChatList from './features/chat/pages/ChatList';
+import ChatThread from './features/chat/pages/ChatThread';
+
+// Wallet
+import Wallet from './features/wallet/pages/Wallet';
+
+// Notifications
+import Notifications from './features/notifications/pages/Notifications';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public — full-screen, outside AppShell */}
+        <Route path="/" element={<Landing />} />
+
+        <Route element={<AppShell />}>
+          {/* Auth */}
+          <Route path="/welcome" element={<Welcome />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/otp" element={<OtpVerify />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+
+          {/* App */}
+          <Route path="/home" element={<Home />} />
+          <Route path="/jobs" element={<Jobs />} />
+          <Route path="/jobs/:id" element={<JobDetails />} />
+          <Route path="/post-job" element={<PostJob />} />
+          <Route path="/profile" element={<Profile />} />
+
+          {/* Chat */}
+          <Route path="/chat" element={<ChatList />} />
+          <Route path="/chat/:id" element={<ChatThread />} />
+
+          {/* Wallet */}
+          <Route path="/wallet" element={<Wallet />} />
+
+          {/* Notifications */}
+          <Route path="/notifications" element={<Notifications />} />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
