@@ -20,7 +20,7 @@ export const AppShell: React.FC = () => {
   const { isAuthenticated, user, refreshUser } = useAuthStore();
   const { fetchWallet } = useWalletStore();
   const { toasts, removeToast, theme } = useUIStore();
-  const { subscribeToNotifications } = useNotificationStore();
+  const { subscribeToNotifications, fetchNotifications } = useNotificationStore();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -95,10 +95,11 @@ export const AppShell: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      fetchNotifications(user.id);
       const unsubscribe = subscribeToNotifications(user.id);
       return unsubscribe;
     }
-  }, [isAuthenticated, user?.id, subscribeToNotifications]);
+  }, [isAuthenticated, user?.id, subscribeToNotifications, fetchNotifications]);
 
   // Theme
   useEffect(() => {

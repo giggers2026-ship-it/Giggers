@@ -107,6 +107,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 // HOME HEADER (matching app.html)
 // ============================================================
 export const HomeHeader: React.FC<{ name: string; city: string; avatar?: string }> = ({ name, city, avatar }) => {
+  const { unreadCount } = useNotificationStore();
+
   return (
     <header className="bg-primary-600 min-h-[120px] px-[25px] pt-[35px] pb-[50px] text-white flex justify-between items-center rounded-b-[32px] shrink-0 relative z-40 shadow-sm">
       <div className="flex flex-col">
@@ -114,6 +116,17 @@ export const HomeHeader: React.FC<{ name: string; city: string; avatar?: string 
         <p className="text-[0.85rem] font-semibold opacity-80 mt-1">📍 {city}</p>
       </div>
       <div className="flex items-center gap-3">
+        {/* Notification Bell */}
+        <NavLink to="/notifications" className="w-[42px] h-[42px] rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center relative transition-colors shadow-sm">
+          <Bell size={20} className="text-white" />
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-[18px] h-[18px] bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-primary-600">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </NavLink>
+
+        {/* Profile Avatar */}
         <NavLink to="/profile" className="w-[42px] h-[42px] rounded-full border-[3px] border-white/40 overflow-hidden bg-white shadow-sm flex items-center justify-center">
           {avatar ? (
             <img src={avatar} alt={name} className="w-full h-full object-cover" />
