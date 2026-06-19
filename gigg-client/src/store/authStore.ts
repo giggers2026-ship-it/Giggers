@@ -114,6 +114,8 @@ export const useAuthStore = create<AuthState>()(
           const res = await api.get<{ user: Record<string, unknown> }>('/api/auth/me');
           set({ user: mapApiUser(res.user) });
         } catch {
+          // If profile check fails (token expired/invalid), clear state to trigger redirect to welcome
+          set({ user: null, token: null, isAuthenticated: false });
         }
       },
       logout: async () => {

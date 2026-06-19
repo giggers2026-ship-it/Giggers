@@ -12,7 +12,7 @@ import { useNotificationStore } from '../../store/notificationStore';
 // Paths that don't need auth and are always accessible
 const PUBLIC_PATHS = ['/', '/welcome', '/login', '/register', '/otp', '/forgot-password'];
 // Paths that are part of the onboarding flow (auth required, but app features not required)
-const ONBOARDING_PATHS = ['/kyc', '/pending', '/profile'];
+const ONBOARDING_PATHS = ['/kyc', '/pending'];
 // Paths that hide the bottom navigation
 const HIDE_NAV_PATHS = ['/welcome', '/login', '/register', '/otp', '/post-job', '/forgot-password', '/kyc', '/pending'];
 
@@ -29,10 +29,10 @@ export const AppShell: React.FC = () => {
 
   // 1. Not logged in + trying to access protected route → go to welcome
   useEffect(() => {
-    if (!isAuthenticated && !isPublicPath && !isOnboardingPath) {
+    if (!isAuthenticated && !isPublicPath) {
       navigate('/welcome');
     }
-  }, [isAuthenticated, isPublicPath, isOnboardingPath, navigate]);
+  }, [isAuthenticated, isPublicPath, navigate]);
 
   // 2. Logged in → always refresh user status silently
   useEffect(() => {
@@ -49,11 +49,12 @@ export const AppShell: React.FC = () => {
       !user.isApproved &&
       (user.kycStatus === 'not_started' || user.kycStatus === 'rejected') &&
       !isPublicPath &&
-      !isOnboardingPath
+      !isOnboardingPath &&
+      location.pathname !== '/profile'
     ) {
       navigate('/kyc', { replace: true });
     }
-  }, [isAuthenticated, user, isPublicPath, isOnboardingPath, navigate]);
+  }, [isAuthenticated, user, isPublicPath, isOnboardingPath, location.pathname, navigate]);
 
   // 4. Already submitted but on /kyc → push to /pending
   useEffect(() => {
@@ -82,7 +83,8 @@ export const AppShell: React.FC = () => {
     !user.isApproved &&
     user.kycStatus === 'submitted' &&
     !isPublicPath &&
-    !isOnboardingPath;
+    !isOnboardingPath &&
+    location.pathname !== '/profile';
 
   // Wallet + notifications
   useEffect(() => {
