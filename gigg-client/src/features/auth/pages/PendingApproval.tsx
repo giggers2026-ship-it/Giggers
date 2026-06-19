@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, LogOut, CheckCircle, FileCheck, RefreshCw, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Clock, LogOut, CheckCircle, FileCheck, RefreshCw, Shield, User as UserIcon } from 'lucide-react';
 import { useAuthStore } from '../../../store/authStore';
 
 export default function PendingApproval() {
+  const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -29,9 +31,19 @@ export default function PendingApproval() {
   return (
     <div className="min-h-screen flex flex-col bg-white dark:bg-dark-900">
       {/* Top gradient bar */}
-      <div className="bg-gradient-to-br from-sky-500 via-indigo-500 to-violet-600 px-5 pt-14 pb-24 relative overflow-hidden flex-shrink-0">
+      <div className="bg-gradient-to-br from-sky-500 via-indigo-500 to-violet-600 px-5 pt-12 pb-24 relative overflow-hidden flex-shrink-0">
         <div className="absolute -top-8 -right-8 w-44 h-44 bg-white/5 rounded-full" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-10 -translate-x-10" />
+
+        <div className="flex justify-end mb-4 relative z-10">
+          <button
+            onClick={() => navigate('/profile')}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold text-white transition-colors"
+          >
+            <UserIcon size={13} /> View Profile
+          </button>
+        </div>
+
         <div className="relative z-10 flex flex-col items-center text-center">
           {/* Pulsing clock icon */}
           <motion.div

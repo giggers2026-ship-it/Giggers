@@ -7,6 +7,7 @@ import {
   Camera,
   CheckCircle,
   Clock,
+  LogOut,
   MapPin,
   Shield,
   Upload,
@@ -343,7 +344,7 @@ const SLIDE_VARIANTS = {
 
 export default function KycWizard() {
   const navigate = useNavigate();
-  const { user, refreshUser } = useAuthStore();
+  const { user, refreshUser, logout } = useAuthStore();
   const { addToast } = useUIStore();
 
   // Step 1 — Personal Info
@@ -486,15 +487,32 @@ export default function KycWizard() {
         <div className="absolute -top-8 -right-8 w-44 h-44 bg-white/5 rounded-full" />
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-10 -translate-x-10" />
 
-        {step > 1 && (
+        <div className="flex justify-between items-center mb-4 relative z-10">
+          {step > 1 ? (
+            <button
+              onClick={() => goTo(step - 1)}
+              className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-white"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold text-white transition-colors"
+            >
+              <UserIcon size={13} /> Profile
+            </button>
+          )}
           <button
-            onClick={() => goTo(step - 1)}
-            className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center mb-4 relative z-10"
+            onClick={() => {
+              logout();
+              navigate('/');
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold text-white transition-colors"
           >
-            <ArrowLeft size={18} className="text-white" />
+            <LogOut size={13} /> Sign out
           </button>
-        )}
-        {step === 1 && <div className="h-9 mb-4" />}
+        </div>
 
         <div className="relative z-10 mb-2">
           <p className="text-white/60 text-[11px] font-bold uppercase tracking-widest">

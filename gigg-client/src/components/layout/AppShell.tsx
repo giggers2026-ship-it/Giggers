@@ -12,7 +12,7 @@ import { useNotificationStore } from '../../store/notificationStore';
 // Paths that don't need auth and are always accessible
 const PUBLIC_PATHS = ['/', '/welcome', '/login', '/register', '/otp', '/forgot-password'];
 // Paths that are part of the onboarding flow (auth required, but app features not required)
-const ONBOARDING_PATHS = ['/kyc', '/pending'];
+const ONBOARDING_PATHS = ['/kyc', '/pending', '/profile'];
 // Paths that hide the bottom navigation
 const HIDE_NAV_PATHS = ['/welcome', '/login', '/register', '/otp', '/post-job', '/forgot-password', '/kyc', '/pending'];
 

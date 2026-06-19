@@ -653,12 +653,7 @@ export default function Profile() {
 
   const [modal, setModal] = useState<null | 'edit' | 'skills' | 'settings' | 'help' | 'verify'>(null);
 
-  // If they land here and KYC isn't done, redirect to the dedicated wizard
-  useEffect(() => {
-    if (user && (user.kycStatus === 'not_started' || user.kycStatus === 'rejected')) {
-      navigate('/kyc', { replace: true });
-    }
-  }, [user, navigate]);
+
 
   if (!user) return null;
 
@@ -782,7 +777,7 @@ export default function Profile() {
           onClick={() => {
             // Only open wizard for not_started or rejected states
             if (!user.isVerified && user.kycStatus !== 'submitted') {
-              setModal('verify');
+              navigate('/kyc');
             }
           }}
           className={`mb-6 flex items-center gap-4 border ${
