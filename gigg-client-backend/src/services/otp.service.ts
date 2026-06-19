@@ -35,19 +35,21 @@ async function sendViaTwilio(phone: string, otp: string): Promise<void> {
   );
 }
 
+const DEV_OTP = '1234';
+
 export async function sendOtp(phone: string): Promise<void> {
-  const otp = generateOtp();
-  const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-  otpStore.set(phone, { otp, expiresAt, attempts: 0 });
-
-  // Dev bypass — skip SMS in development
+  // Dev mode — use fixed OTP, no SMS needed
   if (process.env.NODE_ENV === 'development') {
-    console.log(`[DEV] OTP for ${phone}: ${otp}`);
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+    otpStore.set(phone, { otp: DEV_OTP, expiresAt, attempts: 0 });
+    console.log(`[DEV] OTP for ${phone}: ${DEV_OTP}`);
     return;
   }
 
-  // Try MSG91 first, fall back to Twilio
+  const otp = generateOtp();
+  const expiresAt = Date.now() + 10 * 60 * 1000;
+  otpStore.set(phone, { otp, expiresAt, attempts: 0 });
+
   if (process.env.MSG91_AUTH_KEY) {
     await sendViaMSG91(phone, otp);
   } else if (process.env.TWILIO_ACCOUNT_SID) {
@@ -58,6 +60,11 @@ export async function sendOtp(phone: string): Promise<void> {
 }
 
 export function verifyOtp(phone: string, otp: string): boolean {
+  // Dev mode — always accept the fixed OTP without consuming the store
+  if (process.env.NODE_ENV === 'development' && otp === DEV_OTP) {
+    return true;
+  }
+
   const session = otpStore.get(phone);
   if (!session) return false;
   if (Date.now() > session.expiresAt) {

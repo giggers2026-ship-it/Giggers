@@ -9,10 +9,10 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-
   sendOtp: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string, role?: 'worker' | 'employer') => Promise<boolean>;
   register: (data: Partial<UserProfile> & { role: 'worker' | 'employer'; otp: string }) => Promise<void>;
+  refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: UserProfile) => void;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
@@ -24,22 +24,33 @@ function mapApiUser(u: Record<string, unknown>): UserProfile {
     name: (u.name as string) || '',
     email: (u.email as string) || '',
     phone: (u.phone as string) || '',
-    role: (u.role as 'worker' | 'employer' | 'admin') || 'worker',
+    role: ((u.role as 'worker' | 'employer' | 'admin') || 'worker') === 'admin' ? 'worker' : (u.role as 'worker' | 'employer') || 'worker',
     avatar: u.avatar as string | undefined,
+    selfie: (u.selfie as string | undefined) ?? (u.selfie_url as string | undefined),
     isVerified: Boolean(u.isVerified ?? u.is_verified),
     isApproved: Boolean(u.isApproved ?? u.is_approved),
     aadhaarVerified: Boolean(u.aadhaarVerified ?? u.aadhaar_verified),
     selfieVerified: Boolean(u.selfieVerified ?? u.selfie_verified),
+    aadhaarNumber: (u.aadhaarNumber as string | undefined) ?? (u.aadhaar_number as string | undefined),
+    aadhaarFront: (u.aadhaarFront as string | undefined) ?? (u.aadhaar_front_url as string | undefined),
+    aadhaarBack: (u.aadhaarBack as string | undefined) ?? (u.aadhaar_back_url as string | undefined),
+    panNumber: (u.panNumber as string | undefined) ?? (u.pan_number as string | undefined),
+    panFront: (u.panFront as string | undefined) ?? (u.pan_front_url as string | undefined),
+    panBack: (u.panBack as string | undefined) ?? (u.pan_back_url as string | undefined),
     city: (u.city as string) || '',
     area: (u.area as string) || '',
     createdAt: (u.createdAt as string) || (u.created_at as string) || new Date().toISOString(),
+    kycStatus: ((u.kycStatus as UserProfile['kycStatus']) || (u.kyc_status as UserProfile['kycStatus']) || 'not_started'),
+    kycSubmittedAt: (u.kycSubmittedAt as string | undefined) ?? (u.kyc_submitted_at as string | undefined),
+    kycReviewedAt: (u.kycReviewedAt as string | undefined) ?? (u.kyc_reviewed_at as string | undefined),
+    kycRejectionReason: (u.kycRejectionReason as string | undefined) ?? (u.kyc_rejection_reason as string | undefined),
     completedJobs: Number(u.completedJobs ?? u.completed_jobs) || 0,
     totalJobsPosted: Number(u.totalJobsPosted ?? u.total_jobs_posted) || 0,
     rating: Number(u.rating) || 0,
     reviewCount: Number(u.reviewCount ?? u.review_count) || 0,
     totalEarnings: Number(u.totalEarnings ?? u.total_earnings) || 0,
     attendanceRate: Number(u.attendanceRate ?? u.attendance_rate) || 100,
-    companyName: u.companyName as string | undefined ?? u.company_name as string | undefined,
+    companyName: (u.companyName as string | undefined) ?? (u.company_name as string | undefined),
     isVerifiedEmployer: Boolean(u.isVerifiedEmployer ?? u.is_verified_employer),
     bio: u.bio as string | undefined,
     skills: u.skills as string[] | undefined,
@@ -57,8 +68,6 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
-
-      /** Step 1: send OTP to phone via backend (MSG91 / Twilio) */
       sendOtp: async (phone: string) => {
         set({ isLoading: true });
         try {
@@ -67,73 +76,55 @@ export const useAuthStore = create<AuthState>()(
           set({ isLoading: false });
         }
       },
-
-      /** Step 2: verify OTP — signs in existing user or signals new user */
       verifyOtp: async (phone: string, otp: string, role?: 'worker' | 'employer') => {
         set({ isLoading: true });
         try {
-          const res = await api.post<{
-            token: string;
-            user: Record<string, unknown>;
-            isNewUser?: boolean;
-          }>('/api/auth/verify-otp', {
-            phone: phone.replace(/\s/g, ''),
-            otp,
-            ...(role ? { role } : {}),
+          const res = await api.post<{ token: string; user: Record<string, unknown>; isNewUser?: boolean }>('/api/auth/verify-otp', {
+            phone: phone.replace(/\s/g, ''), otp, ...(role ? { role } : {}),
           });
-
-          set({
-            token: res.token,
-            user: mapApiUser(res.user),
-            isAuthenticated: true,
-            isLoading: false,
-          });
+          set({ token: res.token, user: mapApiUser(res.user), isAuthenticated: true, isLoading: false });
           return true;
         } catch (err: any) {
           set({ isLoading: false });
           throw err;
         }
       },
-
-      /** Register new user — called from Register page after OTP verify */
       register: async (data) => {
         set({ isLoading: true });
         try {
-          const res = await api.post<{ token: string; user: Record<string, unknown> }>(
-            '/api/auth/verify-otp',
-            {
-              phone: (data.phone || '').replace(/\s/g, ''),
-              otp: data.otp,
-              name: data.name,
-              role: data.role,
-            }
-          );
-          set({
-            token: res.token,
-            user: mapApiUser(res.user),
-            isAuthenticated: true,
-            isLoading: false,
+          const res = await api.post<{ token: string; user: Record<string, unknown> }>('/api/auth/verify-otp', {
+            phone: (data.phone || '').replace(/\s/g, ''),
+            otp: data.otp,
+            name: data.name,
+            role: data.role,
+            city: data.city,
+            area: data.area,
+            companyName: data.role === 'employer' ? data.companyName : undefined,
           });
+          set({ token: res.token, user: mapApiUser(res.user), isAuthenticated: true, isLoading: false });
         } catch (err: any) {
           set({ isLoading: false });
           throw err;
         }
       },
-
+      refreshUser: async () => {
+        const { token, isAuthenticated } = get();
+        if (!token || !isAuthenticated) return;
+        try {
+          const res = await api.get<{ user: Record<string, unknown> }>('/api/auth/me');
+          set({ user: mapApiUser(res.user) });
+        } catch {
+        }
+      },
       logout: async () => {
-        // Also sign out of Supabase session if any
         await supabase.auth.signOut().catch(() => {});
         set({ user: null, token: null, isAuthenticated: false });
       },
-
       setUser: (user) => set({ user }),
-
-      /** Update profile fields via Supabase (direct, no backend needed for profile edits) */
       updateProfile: async (updates) => {
         const { user } = get();
         if (!user) return;
         set({ isLoading: true });
-
         const dbUpdates: Record<string, unknown> = {};
         if (updates.name !== undefined) dbUpdates.name = updates.name;
         if (updates.city !== undefined) dbUpdates.city = updates.city;
@@ -146,23 +137,13 @@ export const useAuthStore = create<AuthState>()(
         if (updates.age !== undefined) dbUpdates.age = updates.age;
         if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
         if (updates.companyName !== undefined) dbUpdates.company_name = updates.companyName;
-
-        const { data: updated, error } = await supabase
-          .from('profiles')
-          .update(dbUpdates)
-          .eq('id', user.id)
-          .select()
-          .single();
-
+        const { data: updated, error } = await supabase.from('profiles').update(dbUpdates).eq('id', user.id).select().single();
         if (!error && updated) {
           set({ user: mapApiUser(updated as Record<string, unknown>) });
         }
         set({ isLoading: false });
       },
     }),
-    {
-      name: 'giggers-auth',
-      partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }),
-    }
+    { name: 'giggers-auth', partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }) }
   )
 );

@@ -7,7 +7,49 @@ import { AuthenticatedRequest } from '../types';
 
 const phoneSchema = z.string().regex(/^[6-9]\d{9}$/, 'Invalid Indian mobile number');
 
-// POST /api/auth/send-otp
+function serializeProfile(profile: Record<string, any>) {
+  return {
+    id: profile.id,
+    name: profile.name || '',
+    email: profile.email || '',
+    phone: profile.phone || '',
+    role: profile.role || 'worker',
+    avatar: profile.avatar || undefined,
+    selfie: profile.selfie_url || undefined,
+    isApproved: Boolean(profile.is_approved),
+    isVerified: Boolean(profile.is_verified),
+    aadhaarVerified: Boolean(profile.aadhaar_verified),
+    selfieVerified: Boolean(profile.selfie_verified),
+    aadhaarNumber: profile.aadhaar_number || undefined,
+    aadhaarFront: profile.aadhaar_front_url || undefined,
+    aadhaarBack: profile.aadhaar_back_url || undefined,
+    panNumber: profile.pan_number || undefined,
+    panFront: profile.pan_front_url || undefined,
+    panBack: profile.pan_back_url || undefined,
+    city: profile.city || '',
+    area: profile.area || '',
+    createdAt: profile.created_at,
+    completedJobs: profile.completed_jobs || 0,
+    totalJobsPosted: profile.total_jobs_posted || 0,
+    rating: Number(profile.rating) || 0,
+    reviewCount: profile.review_count || 0,
+    totalEarnings: Number(profile.total_earnings) || 0,
+    attendanceRate: Number(profile.attendance_rate) || 100,
+    companyName: profile.company_name || undefined,
+    isVerifiedEmployer: Boolean(profile.is_verified_employer),
+    bio: profile.bio || undefined,
+    skills: profile.skills || [],
+    languages: profile.languages || [],
+    categories: profile.categories || [],
+    gender: profile.gender || undefined,
+    age: profile.age || undefined,
+    kycStatus: profile.kyc_status || 'not_started',
+    kycSubmittedAt: profile.kyc_submitted_at || undefined,
+    kycReviewedAt: profile.kyc_reviewed_at || undefined,
+    kycRejectionReason: profile.kyc_rejection_reason || undefined,
+  };
+}
+
 export async function sendOtpHandler(req: Request, res: Response): Promise<void> {
   const result = z.object({ phone: phoneSchema }).safeParse(req.body);
   if (!result.success) {
@@ -22,13 +64,15 @@ export async function sendOtpHandler(req: Request, res: Response): Promise<void>
   }
 }
 
-// POST /api/auth/verify-otp
 export async function verifyOtpHandler(req: Request, res: Response): Promise<void> {
   const result = z.object({
     phone: phoneSchema,
-    otp: z.string().length(6),
+    otp: z.string().min(4).max(6),
     name: z.string().min(2).optional(),
     role: z.enum(['worker', 'employer']).optional(),
+    city: z.string().optional(),
+    area: z.string().optional(),
+    companyName: z.string().optional(),
   }).safeParse(req.body);
 
   if (!result.success) {
@@ -36,37 +80,64 @@ export async function verifyOtpHandler(req: Request, res: Response): Promise<voi
     return;
   }
 
-  const { phone, otp, name, role } = result.data;
+  const { phone, otp, name, role, city, area, companyName } = result.data;
 
   if (!verifyOtp(phone, otp)) {
     res.status(401).json({ error: 'Invalid or expired OTP' });
     return;
   }
 
-  // Find or create profile in Supabase
-  let { data: profile } = await supabase
-    .from('profiles')
-    .select('id, name, role, is_approved, is_verified, avatar')
-    .eq('phone', phone)
-    .single();
+  let profile: Record<string, any> | null = null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('phone', phone)
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    profile = data ?? null;
+  } catch (err: any) {
+    res.status(500).json({ error: 'Database error: ' + (err.message || 'Failed to query profile') });
+    return;
+  }
 
   if (!profile) {
-    // New user — register
     if (!name || !role) {
       res.status(400).json({ error: 'New user requires name and role', isNewUser: true });
       return;
     }
-    const { data: newProfile, error } = await supabase
-      .from('profiles')
-      .insert({ phone, name, role, is_approved: false, is_verified: false })
-      .select('id, name, role, is_approved, is_verified, avatar')
-      .single();
 
-    if (error || !newProfile) {
-      res.status(500).json({ error: 'Failed to create profile' });
+    try {
+      const { data: newProfile, error } = await supabase
+        .from('profiles')
+        .insert({
+          phone,
+          name,
+          role,
+          city: city || '',
+          area: area || '',
+          company_name: role === 'employer' ? companyName || null : null,
+          is_approved: false,
+          is_verified: false,
+          aadhaar_verified: false,
+          selfie_verified: false,
+          kyc_status: 'not_started',
+        })
+        .select('*')
+        .single();
+
+      if (error || !newProfile) throw error ?? new Error('No profile returned');
+      profile = newProfile;
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to create profile: ' + (err.message || 'Unknown error') });
       return;
     }
-    profile = newProfile;
+  }
+
+  if (!profile) {
+    res.status(500).json({ error: 'Profile was not available after verification' });
+    return;
   }
 
   const token = signToken({
@@ -76,21 +147,9 @@ export async function verifyOtpHandler(req: Request, res: Response): Promise<voi
     name: profile.name,
   });
 
-  res.json({
-    token,
-    user: {
-      id: profile.id,
-      name: profile.name,
-      phone,
-      role: profile.role,
-      isApproved: profile.is_approved,
-      isVerified: profile.is_verified,
-      avatar: profile.avatar,
-    },
-  });
+  res.json({ token, user: serializeProfile(profile) });
 }
 
-// GET /api/auth/me
 export async function meHandler(req: AuthenticatedRequest, res: Response): Promise<void> {
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -103,12 +162,10 @@ export async function meHandler(req: AuthenticatedRequest, res: Response): Promi
     return;
   }
 
-  res.json({ user: profile });
+  res.json({ user: serializeProfile(profile as Record<string, any>) });
 }
 
-// POST /api/auth/refresh
 export async function refreshHandler(req: AuthenticatedRequest, res: Response): Promise<void> {
-  // User is already verified by requireAuth middleware — re-issue a fresh token
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, name, phone, role')
@@ -129,3 +186,4 @@ export async function refreshHandler(req: AuthenticatedRequest, res: Response): 
 
   res.json({ token });
 }
+

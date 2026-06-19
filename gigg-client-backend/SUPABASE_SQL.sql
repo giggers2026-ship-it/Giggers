@@ -2,7 +2,94 @@
 -- Run this in Supabase SQL editor (project: npvumnhdswjuymqgqzoi)
 -- ============================================================
 
--- 1. Wallets table
+-- 0. Profiles table (MUST run first — everything else references it)
+CREATE TABLE IF NOT EXISTS profiles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone text UNIQUE NOT NULL,
+  name text NOT NULL DEFAULT '',
+  role text NOT NULL CHECK (role IN ('worker', 'employer', 'admin')) DEFAULT 'worker',
+  avatar text,
+  bio text,
+  city text NOT NULL DEFAULT '',
+  area text NOT NULL DEFAULT '',
+  gender text CHECK (gender IN ('male', 'female', 'other')),
+  age integer,
+  skills text[] DEFAULT '{}',
+  languages text[] DEFAULT '{}',
+  categories text[] DEFAULT '{}',
+  company_name text,
+  is_verified boolean NOT NULL DEFAULT false,
+  is_approved boolean NOT NULL DEFAULT false,
+  is_verified_employer boolean NOT NULL DEFAULT false,
+  aadhaar_verified boolean NOT NULL DEFAULT false,
+  selfie_verified boolean NOT NULL DEFAULT false,
+  completed_jobs integer NOT NULL DEFAULT 0,
+  total_jobs_posted integer NOT NULL DEFAULT 0,
+  rating numeric(3,2) NOT NULL DEFAULT 0,
+  review_count integer NOT NULL DEFAULT 0,
+  total_earnings numeric(12,2) NOT NULL DEFAULT 0,
+  attendance_rate numeric(5,2) NOT NULL DEFAULT 100,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+-- Service role bypasses RLS; these policies cover client-side access
+CREATE POLICY "users can read own profile" ON profiles FOR SELECT USING (true);
+CREATE POLICY "users can update own profile" ON profiles FOR UPDATE USING (true);
+
+-- 1. Jobs table (needed before transactions/worker_locations)
+CREATE TABLE IF NOT EXISTS jobs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employer_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  title text NOT NULL DEFAULT '',
+  category text NOT NULL DEFAULT '',
+  category_emoji text DEFAULT '💼',
+  description text DEFAULT '',
+  date text NOT NULL DEFAULT '',
+  reporting_time text DEFAULT '',
+  end_time text DEFAULT '',
+  location text DEFAULT '',
+  address text DEFAULT '',
+  lat double precision DEFAULT 19.076,
+  lng double precision DEFAULT 72.877,
+  workers_needed integer NOT NULL DEFAULT 1,
+  workers_hired integer NOT NULL DEFAULT 0,
+  pay_per_worker numeric(10,2) NOT NULL DEFAULT 0,
+  food_provided boolean NOT NULL DEFAULT false,
+  transport_provided boolean NOT NULL DEFAULT false,
+  dress_code text DEFAULT 'Casual',
+  languages_required text[] DEFAULT '{}',
+  gender_preference text DEFAULT 'any' CHECK (gender_preference IN ('any', 'male', 'female')),
+  status text NOT NULL DEFAULT 'active' CHECK (status IN ('draft', 'active', 'completed', 'cancelled')),
+  is_featured boolean NOT NULL DEFAULT false,
+  is_urgent boolean NOT NULL DEFAULT false,
+  applicants_count integer NOT NULL DEFAULT 0,
+  location_lat double precision,
+  location_lng double precision,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anyone can view active jobs" ON jobs FOR SELECT USING (true);
+CREATE POLICY "employers can insert own jobs" ON jobs FOR INSERT WITH CHECK (true);
+CREATE POLICY "employers can update own jobs" ON jobs FOR UPDATE USING (true);
+
+-- Applications table
+CREATE TABLE IF NOT EXISTS applications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id uuid NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  worker_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  status text NOT NULL DEFAULT 'applied' CHECK (status IN ('applied', 'shortlisted', 'hired', 'rejected', 'completed', 'no_show')),
+  applied_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(job_id, worker_id)
+);
+ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "workers see own applications" ON applications FOR SELECT USING (true);
+CREATE POLICY "workers can apply" ON applications FOR INSERT WITH CHECK (true);
+CREATE POLICY "employers can update applications" ON applications FOR UPDATE USING (true);
+
+-- 2. Wallets table
 CREATE TABLE IF NOT EXISTS wallets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
@@ -77,6 +164,46 @@ BEGIN
 END;
 $$;
 
--- 5. Add location columns to jobs table if not exists
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location_lat double precision;
-ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location_lng double precision;
+-- 5. (location columns are included in the jobs table definition above)
+
+-- 6. KYC fields on profiles
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS aadhaar_number text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS aadhaar_front_url text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS aadhaar_back_url text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pan_number text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pan_front_url text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pan_back_url text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS selfie_url text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS kyc_status text NOT NULL DEFAULT 'not_started';
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS kyc_submitted_at timestamptz;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS kyc_reviewed_at timestamptz;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS kyc_rejection_reason text;
+
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_kyc_status_check;
+ALTER TABLE profiles ADD CONSTRAINT profiles_kyc_status_check CHECK (kyc_status IN ('not_started', 'submitted', 'approved', 'rejected'));
+
+-- 7. Combined KYC submissions table
+CREATE TABLE IF NOT EXISTS kyc_documents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL UNIQUE REFERENCES profiles(id) ON DELETE CASCADE,
+  type text NOT NULL DEFAULT 'identity' CHECK (type IN ('identity')),
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  full_name text NOT NULL DEFAULT '',
+  city text NOT NULL DEFAULT '',
+  area text NOT NULL DEFAULT '',
+  company_name text,
+  aadhaar_number text,
+  front_url text,
+  back_url text,
+  pan_number text,
+  pan_front_url text,
+  pan_back_url text,
+  selfie_url text,
+  rejection_reason text,
+  submitted_at timestamptz NOT NULL DEFAULT now(),
+  reviewed_at timestamptz
+);
+ALTER TABLE kyc_documents ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service reads kyc docs" ON kyc_documents FOR SELECT USING (true);
+CREATE POLICY "service inserts kyc docs" ON kyc_documents FOR INSERT WITH CHECK (true);
+CREATE POLICY "service updates kyc docs" ON kyc_documents FOR UPDATE USING (true);

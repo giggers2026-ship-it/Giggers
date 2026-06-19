@@ -82,7 +82,7 @@ export default function Wallet() {
 
   if (!user) return null;
 
-  const balance = wallet?.balance ?? 0;
+  const balance = wallet?.currentBalance ?? 0;
 
   return (
     <div className="pb-24 font-sans">
@@ -144,7 +144,7 @@ export default function Wallet() {
                     <div>
                       <p className="font-extrabold text-sm text-slate-900 dark:text-white mb-0.5 leading-tight">{tx.description}</p>
                       <p className="text-[10px] font-bold text-slate-400">
-                        {new Date(tx.createdAt).toLocaleDateString()} · {new Date(tx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                         {tx.date ? new Date(tx.date).toLocaleDateString() : ''} · {tx.date ? new Date(tx.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                       </p>
                     </div>
                   </div>

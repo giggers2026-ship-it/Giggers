@@ -30,11 +30,19 @@ export const useWalletStore = create<WalletState>()(
         if (!user) return;
         set({ isLoading: true });
 
-        const { data } = await supabase
+        // Use maybeSingle() — returns null instead of 406 when the row doesn't exist yet
+        const { data: walletData } = await supabase
           .from('wallets')
           .select('balance, escrow_balance')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
+
+        // Auto-create a zero-balance wallet for brand-new users
+        if (!walletData) {
+          await supabase
+            .from('wallets')
+            .upsert({ user_id: user.id, balance: 0, escrow_balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true });
+        }
 
         const { data: txns } = await supabase
           .from('transactions')
@@ -45,15 +53,18 @@ export const useWalletStore = create<WalletState>()(
 
         set({
           wallet: {
-            balance: data?.balance || 0,
-            escrowBalance: data?.escrow_balance || 0,
+            currentBalance: walletData?.balance ?? 0,
+            pendingBalance: walletData?.escrow_balance ?? 0,
+            totalEarnings: 0,
+            totalWithdrawn: 0,
             transactions: (txns || []).map((t: any) => ({
               id: t.id,
               type: t.type,
               amount: t.amount,
               description: t.description,
+              date: t.created_at,
               status: t.status,
-              createdAt: t.created_at,
+              category: t.category || 'earning',
             })),
           },
           isLoading: false,

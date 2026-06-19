@@ -83,12 +83,12 @@ export default function Login() {
             <Input
               label="Phone Number"
               type="tel"
-              placeholder="9999999999"
+              placeholder="Enter your 10-digit number"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               leftIcon={<Phone size={16} />}
             />
-            <p className="text-xs text-amber-600 mt-1 ml-1">Use <strong>9999999999</strong> for testing without SMS.</p>
+            <p className="text-xs text-amber-600 mt-1 ml-1">Any 10-digit number works. OTP will be <strong>1234</strong>.</p>
           </div>
 
           <div className="bg-primary-50 dark:bg-primary-900/10 p-3.5 rounded-2xl border border-primary-100 dark:border-primary-800/30">

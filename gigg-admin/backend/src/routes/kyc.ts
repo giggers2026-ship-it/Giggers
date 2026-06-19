@@ -5,10 +5,6 @@ import { requireAdmin, AuthenticatedRequest } from '../middleware/auth';
 const router = Router();
 router.use(requireAdmin);
 
-/**
- * GET /api/kyc
- * List all KYC submissions (optionally filter by status)
- */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const status = (req.query.status as string) || 'pending';
   const page = parseInt(req.query.page as string) || 1;
@@ -17,7 +13,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
 
   const { data, error, count } = await supabaseAdmin
     .from('kyc_documents')
-    .select('*, profiles!kyc_documents_user_id_fkey(name, email, avatar)', { count: 'exact' })
+    .select('*, profiles!kyc_documents_user_id_fkey(name, email, avatar, phone, role, city, area, company_name, kyc_status)', { count: 'exact' })
     .eq('status', status)
     .range(offset, offset + limit - 1)
     .order('submitted_at', { ascending: false });
@@ -30,10 +26,6 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
   res.json({ data, total: count, page, limit });
 });
 
-/**
- * GET /api/kyc/:id
- * Get specific KYC document detail
- */
 router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
@@ -51,17 +43,13 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
   res.json(data);
 });
 
-/**
- * PATCH /api/kyc/:id/approve
- * Approve a KYC submission and mark user as verified
- */
 router.patch('/:id/approve', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params;
+  const reviewedAt = new Date().toISOString();
 
-  // Get the KYC record first
   const { data: kyc, error: kycError } = await supabaseAdmin
     .from('kyc_documents')
-    .select('user_id, type')
+    .select('*')
     .eq('id', id)
     .single();
 
@@ -70,10 +58,9 @@ router.patch('/:id/approve', async (req: AuthenticatedRequest, res: Response): P
     return;
   }
 
-  // Update KYC status
   const { error: updateError } = await supabaseAdmin
     .from('kyc_documents')
-    .update({ status: 'approved', reviewed_at: new Date().toISOString() })
+    .update({ status: 'approved', reviewed_at: reviewedAt, rejection_reason: null })
     .eq('id', id);
 
   if (updateError) {
@@ -81,35 +68,68 @@ router.patch('/:id/approve', async (req: AuthenticatedRequest, res: Response): P
     return;
   }
 
-  // Mark user as verified in profile
-  const profileUpdates: Record<string, boolean> = {};
-  if (kyc.type === 'aadhaar') profileUpdates['aadhaar_verified'] = true;
-  if (kyc.type === 'selfie') profileUpdates['selfie_verified'] = true;
+  const { error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .update({
+      name: kyc.full_name,
+      city: kyc.city || '',
+      area: kyc.area || '',
+      company_name: kyc.company_name || null,
+      aadhaar_number: kyc.aadhaar_number,
+      aadhaar_front_url: kyc.front_url,
+      aadhaar_back_url: kyc.back_url,
+      pan_number: kyc.pan_number,
+      pan_front_url: kyc.pan_front_url,
+      pan_back_url: kyc.pan_back_url,
+      selfie_url: kyc.selfie_url,
+      aadhaar_verified: true,
+      selfie_verified: true,
+      is_verified: true,
+      is_approved: true,
+      kyc_status: 'approved',
+      kyc_reviewed_at: reviewedAt,
+      kyc_rejection_reason: null,
+    })
+    .eq('id', kyc.user_id);
 
-  // If both verified, set is_verified = true
-  if (kyc.type === 'aadhaar' || kyc.type === 'selfie') {
-    profileUpdates['is_verified'] = true;
+  if (profileError) {
+    res.status(500).json({ error: profileError.message });
+    return;
   }
 
-  await supabaseAdmin.from('profiles').update(profileUpdates).eq('id', kyc.user_id);
+  await supabaseAdmin.from('notifications').insert({
+    user_id: kyc.user_id,
+    type: 'kyc_approved',
+    title: 'KYC Approved',
+    message: 'Your KYC is approved. You can now apply for jobs or post jobs.',
+    is_read: false,
+  }).then(() => undefined).catch(() => undefined);
 
-  res.json({ message: 'KYC approved and user verified' });
+  res.json({ message: 'KYC approved and user activated' });
 });
 
-/**
- * PATCH /api/kyc/:id/reject
- * Reject a KYC submission with a reason
- */
 router.patch('/:id/reject', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params;
   const { reason } = req.body;
+  const reviewedAt = new Date().toISOString();
+
+  const { data: kyc, error: kycError } = await supabaseAdmin
+    .from('kyc_documents')
+    .select('user_id')
+    .eq('id', id)
+    .single();
+
+  if (kycError || !kyc) {
+    res.status(404).json({ error: 'KYC document not found' });
+    return;
+  }
 
   const { error } = await supabaseAdmin
     .from('kyc_documents')
     .update({
       status: 'rejected',
       rejection_reason: reason || 'Does not meet requirements',
-      reviewed_at: new Date().toISOString(),
+      reviewed_at: reviewedAt,
     })
     .eq('id', id);
 
@@ -117,6 +137,27 @@ router.patch('/:id/reject', async (req: AuthenticatedRequest, res: Response): Pr
     res.status(500).json({ error: error.message });
     return;
   }
+
+  await supabaseAdmin
+    .from('profiles')
+    .update({
+      is_approved: false,
+      is_verified: false,
+      aadhaar_verified: false,
+      selfie_verified: false,
+      kyc_status: 'rejected',
+      kyc_reviewed_at: reviewedAt,
+      kyc_rejection_reason: reason || 'Does not meet requirements',
+    })
+    .eq('id', kyc.user_id);
+
+  await supabaseAdmin.from('notifications').insert({
+    user_id: kyc.user_id,
+    type: 'kyc_rejected',
+    title: 'KYC Needs Attention',
+    message: reason || 'Your KYC was rejected. Please review and resubmit your documents.',
+    is_read: false,
+  }).then(() => undefined).catch(() => undefined);
 
   res.json({ message: 'KYC rejected' });
 });

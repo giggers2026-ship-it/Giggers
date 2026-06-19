@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Edit2, LogOut, ChevronRight, Shield, Award, Settings,
   HelpCircle, MapPin, Star, Briefcase, X, Save, Moon, Sun,
@@ -8,6 +8,7 @@ import {
   Bell, CheckCircle, Info, Camera, Upload, Volume2, Languages, Trash2, Smartphone
 } from 'lucide-react';
 import { useAuthStore } from '../../../store/authStore';
+import { api } from '../../../lib/api';
 import { useUIStore } from '../../../store/uiStore';
 import { Avatar, Card, Badge, Button, Input, Toggle, Select, Modal } from '../../../components/ui';
 
@@ -331,6 +332,75 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
   const [backImg, setBackImg] = useState<string | null>(user.aadhaarBack || null);
   const [selfieImg, setSelfieImg] = useState<string | null>(user.selfie || null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraOpen(false);
+  };
+
+  useEffect(() => {
+    return () => stopCamera();
+  }, []);
+
+  useEffect(() => {
+    if (!open || step !== 3) {
+      stopCamera();
+      setCameraError(null);
+    }
+  }, [open, step]);
+
+  useEffect(() => {
+    if (!cameraOpen || step !== 3) return;
+
+    let cancelled = false;
+
+    const startCamera = async () => {
+      setCameraError(null);
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'user',
+            width: { ideal: 1280 },
+            height: { ideal: 1280 },
+          },
+          audio: false,
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => undefined);
+        }
+      } catch {
+        setCameraError('Unable to open the camera. Please allow camera access and try again.');
+        setCameraOpen(false);
+      }
+    };
+
+    startCamera();
+
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+    };
+  }, [cameraOpen, step]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'front' | 'back' | 'selfie') => {
     const file = e.target.files?.[0];
@@ -342,13 +412,60 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
       if (type === 'front') setFrontImg(url);
       if (type === 'back') setBackImg(url);
       if (type === 'selfie') setSelfieImg(url);
-      
+
       setIsVerifying(false);
     }, 1000);
   };
 
+  const openSelfieCamera = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('This device does not support camera capture in the browser.');
+      return;
+    }
+
+    setSelfieImg(null);
+    setCameraOpen(true);
+  };
+
+  const captureSelfie = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setCameraError('Camera is still loading. Please wait a moment and try again.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setCameraError(null);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      setIsVerifying(false);
+      setCameraError('Could not capture the selfie. Please try again.');
+      return;
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const image = canvas.toDataURL('image/jpeg', 0.92);
+
+    if (!image || image === 'data:,') {
+      setIsVerifying(false);
+      setCameraError('Please capture a clearer selfie and try again.');
+      return;
+    }
+
+    setTimeout(() => {
+      setSelfieImg(image);
+      setIsVerifying(false);
+      stopCamera();
+    }, 500);
+  };
+
   const handleNext = () => {
-    if (step < 3) setStep(s => s + 1);
+    if (step < 3) setStep((s) => s + 1);
     else if (step === 3) {
       onVerify({
         aadhaarVerified: true,
@@ -357,18 +474,18 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
         aadhaarNumber: `XXXX XXXX ${aadhaar.slice(-4)}`,
         aadhaarFront: frontImg,
         aadhaarBack: backImg,
-        selfie: selfieImg
+        selfie: selfieImg,
       });
       setStep(4);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={step < 4 ? "ID Verification" : "Verified"}>
+    <Modal open={open} onClose={onClose} title={step < 4 ? 'ID Verification' : 'Verified'}>
       <div className="pb-4">
         {step < 4 && (
           <div className="flex gap-1 mb-6">
-            {[1, 2, 3].map(i => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-primary-500' : 'bg-slate-200 dark:bg-dark-600'}`} />
             ))}
           </div>
@@ -381,7 +498,7 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
             </div>
             <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Identity Verified!</h3>
             <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6">Your Aadhaar and Selfie matching is complete. You have Level 3 access to all jobs.</p>
-            
+
             <div className="w-full bg-slate-50 dark:bg-dark-700 rounded-2xl p-4 mb-4 border border-slate-100 dark:border-dark-600 flex flex-col gap-3">
               <div className="flex justify-between text-xs font-bold">
                 <span className="text-slate-400 uppercase">Aadhaar</span>
@@ -416,11 +533,9 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
                   placeholder="0000 0000 0000"
                   maxLength={12}
                   value={aadhaar}
-                  onChange={e => setAadhaar(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => setAadhaar(e.target.value.replace(/\D/g, ''))}
                 />
-                <div 
-                  className="aspect-[1.6/1] w-full bg-slate-50 dark:bg-dark-700 rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-600 flex flex-col items-center justify-center overflow-hidden group"
-                >
+                <div className="aspect-[1.6/1] w-full bg-slate-50 dark:bg-dark-700 rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-600 flex flex-col items-center justify-center overflow-hidden group">
                   {frontImg ? (
                     <img src={frontImg} className="w-full h-full object-cover" />
                   ) : (
@@ -432,11 +547,11 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
                 </div>
                 <div className="flex gap-3">
                   <div className="relative flex-1">
-                    <input type="file" accept="image/*" capture="environment" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => handleFileChange(e, 'front')} disabled={isVerifying} />
+                    <input type="file" accept="image/*" capture="environment" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => handleFileChange(e, 'front')} disabled={isVerifying} />
                     <Button variant="outline" fullWidth className="pointer-events-none flex items-center justify-center gap-2"><Camera size={16} /> Camera</Button>
                   </div>
                   <div className="relative flex-1">
-                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => handleFileChange(e, 'front')} disabled={isVerifying} />
+                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => handleFileChange(e, 'front')} disabled={isVerifying} />
                     <Button variant="outline" fullWidth className="pointer-events-none flex items-center justify-center gap-2"><Upload size={16} /> Storage</Button>
                   </div>
                 </div>
@@ -452,9 +567,7 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
                   <p className="text-xs font-bold text-primary-900 dark:text-primary-300">Step 2: Aadhaar Back</p>
                   <p className="text-[11px] text-primary-600 mt-0.5">Upload the reverse side of your Aadhaar card.</p>
                 </div>
-                <div 
-                  className="aspect-[1.6/1] w-full bg-slate-50 dark:bg-dark-700 rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-600 flex flex-col items-center justify-center overflow-hidden group"
-                >
+                <div className="aspect-[1.6/1] w-full bg-slate-50 dark:bg-dark-700 rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-600 flex flex-col items-center justify-center overflow-hidden group">
                   {backImg ? (
                     <img src={backImg} className="w-full h-full object-cover" />
                   ) : (
@@ -466,11 +579,11 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
                 </div>
                 <div className="flex gap-3">
                   <div className="relative flex-1">
-                    <input type="file" accept="image/*" capture="environment" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => handleFileChange(e, 'back')} disabled={isVerifying} />
+                    <input type="file" accept="image/*" capture="environment" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => handleFileChange(e, 'back')} disabled={isVerifying} />
                     <Button variant="outline" fullWidth className="pointer-events-none flex items-center justify-center gap-2"><Camera size={16} /> Camera</Button>
                   </div>
                   <div className="relative flex-1">
-                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => handleFileChange(e, 'back')} disabled={isVerifying} />
+                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={(e) => handleFileChange(e, 'back')} disabled={isVerifying} />
                     <Button variant="outline" fullWidth className="pointer-events-none flex items-center justify-center gap-2"><Upload size={16} /> Storage</Button>
                   </div>
                 </div>
@@ -487,12 +600,12 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
               <div className="flex flex-col gap-5">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl border border-emerald-100">
                   <p className="text-xs font-bold text-emerald-900 dark:text-emerald-300">Step 3: Live Selfie</p>
-                  <p className="text-[11px] text-emerald-600 mt-0.5">Take a clear selfie to match your ID photo.</p>
+                  <p className="text-[11px] text-emerald-600 mt-0.5">Open the front camera and capture a clear selfie to match your ID photo.</p>
                 </div>
-                <div 
-                  className="aspect-square w-48 mx-auto bg-slate-50 dark:bg-dark-700 rounded-full border-2 border-dashed border-slate-200 dark:border-dark-600 flex flex-col items-center justify-center overflow-hidden group"
-                >
-                  {selfieImg ? (
+                <div className="aspect-square w-48 mx-auto bg-slate-50 dark:bg-dark-700 rounded-full border-2 border-dashed border-slate-200 dark:border-dark-600 flex flex-col items-center justify-center overflow-hidden group">
+                  {cameraOpen ? (
+                    <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" />
+                  ) : selfieImg ? (
                     <img src={selfieImg} className="w-full h-full object-cover" />
                   ) : (
                     <>
@@ -501,19 +614,25 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
                     </>
                   )}
                 </div>
+                {cameraError && (
+                  <p className="text-xs font-bold text-red-500 text-center">{cameraError}</p>
+                )}
                 <div className="flex gap-3 mt-2">
-                  <div className="relative flex-1">
-                    <input type="file" accept="image/*" capture="user" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => handleFileChange(e, 'selfie')} disabled={isVerifying} />
-                    <Button variant="outline" fullWidth className="pointer-events-none flex items-center justify-center gap-2"><Camera size={16} /> Camera</Button>
-                  </div>
-                  <div className="relative flex-1">
-                    <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => handleFileChange(e, 'selfie')} disabled={isVerifying} />
-                    <Button variant="outline" fullWidth className="pointer-events-none flex items-center justify-center gap-2"><Upload size={16} /> Storage</Button>
-                  </div>
+                  {!cameraOpen ? (
+                    <Button variant="outline" fullWidth onClick={openSelfieCamera} disabled={isVerifying} className="flex items-center justify-center gap-2">
+                      <Camera size={16} />
+                      {selfieImg ? 'Retake Selfie' : 'Camera'}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" fullWidth onClick={stopCamera}>Close Camera</Button>
+                      <Button fullWidth onClick={captureSelfie} disabled={isVerifying}>Capture Selfie</Button>
+                    </>
+                  )}
                 </div>
                 <div className="flex gap-3">
                   <Button variant="outline" fullWidth onClick={() => setStep(2)}>Back</Button>
-                  <Button fullWidth onClick={handleNext} disabled={!selfieImg || isVerifying}>
+                  <Button fullWidth onClick={handleNext} disabled={!selfieImg || isVerifying || cameraOpen}>
                     {isVerifying ? 'Finalizing...' : 'Complete KYC'}
                   </Button>
                 </div>
@@ -525,14 +644,21 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
     </Modal>
   );
 }
-
-// ─── Main Profile Page ───────────────────────────────────────
+// Main Profile Page
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, logout, setUser } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { user, logout, setUser, refreshUser } = useAuthStore();
   const { addToast } = useUIStore();
 
   const [modal, setModal] = useState<null | 'edit' | 'skills' | 'settings' | 'help' | 'verify'>(null);
+
+  // If they land here and KYC isn't done, redirect to the dedicated wizard
+  useEffect(() => {
+    if (user && (user.kycStatus === 'not_started' || user.kycStatus === 'rejected')) {
+      navigate('/kyc', { replace: true });
+    }
+  }, [user, navigate]);
 
   if (!user) return null;
 
@@ -542,23 +668,31 @@ export default function Profile() {
     addToast('Profile updated successfully! ✓', 'success');
   };
 
-  const handleVerification = (data: any) => {
-    const updatedUser = { ...user, ...data };
-    setUser(updatedUser);
+  const handleVerification = async () => {
+    await refreshUser();
     setModal(null);
-    addToast('Identity verified successfully! 🛡️', 'success');
+    setSearchParams({});
+    addToast('KYC submitted successfully. Waiting for admin approval.', 'success');
   };
 
   const handleResetVerification = () => {
     setUser({
       ...user,
       isVerified: false,
+      isApproved: false,
       aadhaarVerified: false,
       selfieVerified: false,
       aadhaarNumber: undefined,
       aadhaarFront: undefined,
       aadhaarBack: undefined,
-      selfie: undefined
+      panNumber: undefined,
+      panFront: undefined,
+      panBack: undefined,
+      selfie: undefined,
+      kycStatus: 'not_started',
+      kycSubmittedAt: undefined,
+      kycReviewedAt: undefined,
+      kycRejectionReason: undefined
     });
     setModal(null);
     addToast('KYC verification reset for demo! 🛡️', 'info');
@@ -644,28 +778,67 @@ export default function Profile() {
         </motion.div>
 
         {/* Verification Status */}
-        <Card 
-          onClick={() => setModal('verify')}
+        <Card
+          onClick={() => {
+            // Only open wizard for not_started or rejected states
+            if (!user.isVerified && user.kycStatus !== 'submitted') {
+              setModal('verify');
+            }
+          }}
           className={`mb-6 flex items-center gap-4 border ${
-            user.isVerified 
-              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/50' 
+            user.isVerified
+              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/50'
+              : user.kycStatus === 'submitted'
+              ? 'bg-sky-50 dark:bg-sky-900/20 border-sky-100 dark:border-sky-800/50'
+              : user.kycStatus === 'rejected'
+              ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/50'
               : 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800/50'
           }`}
         >
           <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-            user.isVerified ? 'bg-emerald-100 dark:bg-emerald-800/50 text-emerald-600' : 'bg-amber-100 dark:bg-amber-800/50 text-amber-600'
+            user.isVerified
+              ? 'bg-emerald-100 dark:bg-emerald-800/50 text-emerald-600'
+              : user.kycStatus === 'submitted'
+              ? 'bg-sky-100 dark:bg-sky-800/50 text-sky-600'
+              : user.kycStatus === 'rejected'
+              ? 'bg-red-100 dark:bg-red-800/50 text-red-600'
+              : 'bg-amber-100 dark:bg-amber-800/50 text-amber-600'
           }`}>
             <Shield size={24} />
           </div>
           <div className="flex-1">
-            <h3 className={`font-extrabold text-sm ${user.isVerified ? 'text-emerald-900 dark:text-emerald-300' : 'text-amber-900 dark:text-amber-300'}`}>
-              {user.isVerified ? 'Identity Verified' : 'Verify Identity'}
+            <h3 className={`font-extrabold text-sm ${
+              user.isVerified
+                ? 'text-emerald-900 dark:text-emerald-300'
+                : user.kycStatus === 'submitted'
+                ? 'text-sky-900 dark:text-sky-300'
+                : user.kycStatus === 'rejected'
+                ? 'text-red-900 dark:text-red-300'
+                : 'text-amber-900 dark:text-amber-300'
+            }`}>
+              {user.isVerified ? 'Identity Verified' : user.kycStatus === 'submitted' ? 'KYC Under Review' : user.kycStatus === 'rejected' ? 'KYC Rejected' : 'Complete KYC'}
             </h3>
-            <p className={`text-xs font-medium ${user.isVerified ? 'text-emerald-700 dark:text-emerald-500' : 'text-amber-700 dark:text-amber-500'}`}>
-              {user.isVerified ? 'Aadhaar & Selfie verified' : 'Complete Aadhaar & Selfie KYC'}
+            <p className={`text-xs font-medium ${
+              user.isVerified
+                ? 'text-emerald-700 dark:text-emerald-500'
+                : user.kycStatus === 'submitted'
+                ? 'text-sky-700 dark:text-sky-500'
+                : user.kycStatus === 'rejected'
+                ? 'text-red-700 dark:text-red-500'
+                : 'text-amber-700 dark:text-amber-500'
+            }`}>
+              {user.isVerified
+                ? 'Aadhaar, PAN and selfie approved'
+                : user.kycStatus === 'submitted'
+                ? 'Waiting for admin approval to unlock jobs'
+                : user.kycStatus === 'rejected'
+                ? user.kycRejectionReason || 'Open to correct and resubmit your documents'
+                : 'Submit Aadhaar, PAN and a live selfie'}
             </p>
           </div>
-          <Badge variant={user.isVerified ? 'success' : 'warning'}>{user.isVerified ? 'Level 3' : 'Level 1'}</Badge>
+          <Badge variant={user.isVerified ? 'success' : user.kycStatus === 'submitted' ? 'primary' : user.kycStatus === 'rejected' ? 'danger' : 'warning'}>
+            {user.isVerified ? 'Approved' : user.kycStatus === 'submitted' ? 'Pending' : user.kycStatus === 'rejected' ? 'Retry' : 'Required'}
+          </Badge>
         </Card>
 
         {/* Menu Items */}
@@ -776,4 +949,8 @@ export default function Profile() {
     </div>
   );
 }
+
+
+
+
 

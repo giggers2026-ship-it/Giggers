@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { Zap, Mail, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 
@@ -7,15 +7,23 @@ const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login, isLoading, error, clearError } = useAuthStore();
+  const { login, isLoading, error, clearError, token, user, _hasHydrated } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/dashboard';
+
+  useEffect(() => {
+    if (_hasHydrated && token && user) {
+      navigate(from, { replace: true });
+    }
+  }, [_hasHydrated, token, user, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     try {
       await login(email, password);
-      navigate('/dashboard');
+      navigate(from, { replace: true });
     } catch {
       // error is set in store
     }
@@ -120,7 +128,7 @@ const Login: React.FC = () => {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="********"
                   required
                   className="admin-input pl-11 pr-12"
                 />
@@ -160,7 +168,7 @@ const Login: React.FC = () => {
           </form>
 
           <p className="text-center text-xs mt-6" style={{ color: '#334155' }}>
-            Protected access • Admin credentials only
+            Protected access - Admin credentials only
           </p>
         </div>
       </div>
