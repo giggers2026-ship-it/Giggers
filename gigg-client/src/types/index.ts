@@ -1,8 +1,5 @@
-// ============================================================
-// GIGGERS – Centralized TypeScript Types
-// ============================================================
-
 export type ThemeMode = 'light' | 'dark';
+export type KycStatus = 'not_started' | 'submitted' | 'approved' | 'rejected';
 
 export interface UserProfile {
   id: string;
@@ -19,27 +16,28 @@ export interface UserProfile {
   aadhaarNumber?: string;
   aadhaarFront?: string;
   aadhaarBack?: string;
+  panNumber?: string;
+  panFront?: string;
+  panBack?: string;
   city: string;
   area: string;
   createdAt: string;
-
-  // Unified properties
+  kycStatus: KycStatus;
+  kycSubmittedAt?: string;
+  kycReviewedAt?: string;
+  kycRejectionReason?: string;
   age?: number;
   gender?: 'male' | 'female' | 'other';
   languages?: string[];
   categories?: string[];
   bio?: string;
   skills?: string[];
-  
-  // Stats
   completedJobs: number;
   totalJobsPosted: number;
   rating: number;
   reviewCount: number;
   totalEarnings: number;
   attendanceRate: number;
-  
-  // Employer specific
   companyName?: string;
   companyLogo?: string;
   isVerifiedEmployer?: boolean;
@@ -89,7 +87,6 @@ export interface Job {
 }
 
 export type JobStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-
 export type ApplicationStatus = 'applied' | 'shortlisted' | 'accepted' | 'rejected' | 'completed';
 
 export interface Application {
@@ -150,7 +147,7 @@ export interface ChatMessage {
   type: 'text' | 'image' | 'file' | 'voice';
   sentAt: string;
   isRead: boolean;
-  duration?: number; // for voice messages in seconds
+  duration?: number;
 }
 
 export interface Transaction {
@@ -192,7 +189,10 @@ export type NotificationType =
   | 'payment_released'
   | 'new_applicant'
   | 'worker_hired'
-  | 'review_received';
+  | 'review_received'
+  | 'kyc_submitted'
+  | 'kyc_approved'
+  | 'kyc_rejected';
 
 export interface Review {
   id: string;
@@ -205,7 +205,6 @@ export interface Review {
   createdAt: string;
 }
 
-// UI State Types
 export interface ToastData {
   id: string;
   message: string;

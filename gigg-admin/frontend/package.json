@@ -5,9 +5,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5174",
+    "dev": "vite --port 5175",
     "build": "tsc && vite build",
-    "preview": "vite preview --port 5174"
+    "preview": "vite preview --port 5175"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.43.4",
@@ -30,3 +30,4 @@
     "vite": "^5.3.1"
   }
 }
+

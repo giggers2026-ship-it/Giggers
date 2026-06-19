@@ -1,6 +1,6 @@
 import { Response, Request } from 'express';
 import { z } from 'zod';
-import { razorpay, verifyPaymentSignature, verifyWebhookSignature } from '../services/razorpay.service';
+import { getRazorpay, verifyPaymentSignature, verifyWebhookSignature } from '../services/razorpay.service';
 import { supabase } from '../utils/supabase';
 import { AuthenticatedRequest } from '../types';
 
@@ -22,7 +22,7 @@ export async function createOrder(req: AuthenticatedRequest, res: Response): Pro
   const receipt = `gigg_${type}_${req.user!.id.slice(0, 8)}_${Date.now()}`;
 
   try {
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount,
       currency: 'INR',
       receipt,

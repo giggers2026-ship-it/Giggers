@@ -12,6 +12,10 @@ import Register from './features/auth/pages/Register';
 import OtpVerify from './features/auth/pages/OtpVerify';
 import ForgotPassword from './features/auth/pages/ForgotPassword';
 
+// KYC + Pending
+import KycWizard from './features/kyc/pages/KycWizard';
+import PendingApproval from './features/auth/pages/PendingApproval';
+
 // Home
 import Home from './features/home/pages/Home';
 
@@ -47,6 +51,10 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/otp" element={<OtpVerify />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+
+          {/* KYC onboarding flow */}
+          <Route path="/kyc" element={<KycWizard />} />
+          <Route path="/pending" element={<PendingApproval />} />
 
           {/* App */}
           <Route path="/home" element={<Home />} />

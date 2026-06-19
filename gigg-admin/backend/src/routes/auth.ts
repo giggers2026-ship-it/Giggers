@@ -43,8 +43,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     .single();
 
   if (profileError || profile?.role !== 'admin') {
-    // Sign them out immediately if not admin
-    await supabaseAdmin.auth.admin.signOut(data.session.access_token);
+    // Revoke the session immediately since this user is not an admin
+    await supabaseAdmin.auth.admin.signOut(data.user.id).catch(() => {});
     res.status(403).json({ error: 'Access denied: admin role required' });
     return;
   }

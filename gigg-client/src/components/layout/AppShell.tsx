@@ -9,35 +9,88 @@ import { useUIStore } from '../../store/uiStore';
 import PendingApproval from '../../features/auth/pages/PendingApproval';
 import { useNotificationStore } from '../../store/notificationStore';
 
+// Paths that don't need auth and are always accessible
+const PUBLIC_PATHS = ['/', '/welcome', '/login', '/register', '/otp', '/forgot-password'];
+// Paths that are part of the onboarding flow (auth required, but app features not required)
+const ONBOARDING_PATHS = ['/kyc', '/pending'];
+// Paths that hide the bottom navigation
+const HIDE_NAV_PATHS = ['/welcome', '/login', '/register', '/otp', '/post-job', '/forgot-password', '/kyc', '/pending'];
+
 export const AppShell: React.FC = () => {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, refreshUser } = useAuthStore();
   const { fetchWallet } = useWalletStore();
   const { toasts, removeToast, theme } = useUIStore();
   const { subscribeToNotifications } = useNotificationStore();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Redirect to welcome if not authenticated and not on a public route
+  const isPublicPath = PUBLIC_PATHS.includes(location.pathname);
+  const isOnboardingPath = ONBOARDING_PATHS.includes(location.pathname);
+
+  // 1. Not logged in + trying to access protected route → go to welcome
   useEffect(() => {
-    const publicPaths = ['/', '/welcome', '/login', '/register', '/otp'];
-    if (!isAuthenticated && !publicPaths.includes(location.pathname)) {
+    if (!isAuthenticated && !isPublicPath && !isOnboardingPath) {
       navigate('/welcome');
     }
-  }, [isAuthenticated, location.pathname, navigate]);
+  }, [isAuthenticated, isPublicPath, isOnboardingPath, navigate]);
 
-  // Authenticated but not yet approved — block access to all protected routes
-  const publicPaths = ['/', '/welcome', '/login', '/register', '/otp'];
-  const isPublicPath = publicPaths.includes(location.pathname);
-  const isPendingApproval = isAuthenticated && user && !user.isApproved && !isPublicPath;
+  // 2. Logged in → always refresh user status silently
+  useEffect(() => {
+    if (isAuthenticated) {
+      refreshUser();
+    }
+  }, [isAuthenticated, refreshUser]);
 
-  // Global wallet fetch
+  // 3. KYC gate: new user or rejected → must complete KYC
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      user &&
+      !user.isApproved &&
+      (user.kycStatus === 'not_started' || user.kycStatus === 'rejected') &&
+      !isPublicPath &&
+      !isOnboardingPath
+    ) {
+      navigate('/kyc', { replace: true });
+    }
+  }, [isAuthenticated, user, isPublicPath, isOnboardingPath, navigate]);
+
+  // 4. Already submitted but on /kyc → push to /pending
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      user &&
+      user.kycStatus === 'submitted' &&
+      !user.isApproved &&
+      location.pathname === '/kyc'
+    ) {
+      navigate('/pending', { replace: true });
+    }
+  }, [isAuthenticated, user, location.pathname, navigate]);
+
+  // 5. Approved → don't allow sitting on /pending or /kyc
+  useEffect(() => {
+    if (isAuthenticated && user?.isApproved && isOnboardingPath) {
+      navigate('/home', { replace: true });
+    }
+  }, [isAuthenticated, user?.isApproved, isOnboardingPath, navigate]);
+
+  // Show the pending overlay for submitted-but-not-approved users on protected routes
+  const isPendingApproval =
+    isAuthenticated &&
+    user &&
+    !user.isApproved &&
+    user.kycStatus === 'submitted' &&
+    !isPublicPath &&
+    !isOnboardingPath;
+
+  // Wallet + notifications
   useEffect(() => {
     if (isAuthenticated && user) {
       fetchWallet();
     }
   }, [isAuthenticated, user, fetchWallet]);
 
-  // Global notification subscription
   useEffect(() => {
     if (isAuthenticated && user) {
       const unsubscribe = subscribeToNotifications(user.id);
@@ -45,6 +98,7 @@ export const AppShell: React.FC = () => {
     }
   }, [isAuthenticated, user?.id, subscribeToNotifications]);
 
+  // Theme
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -53,10 +107,17 @@ export const AppShell: React.FC = () => {
     }
   }, [theme]);
 
-  // Hide nav on specific pages
-  const hideNavPaths = ['/welcome', '/login', '/register', '/otp', '/post-job'];
-  const isDetailsPage = location.pathname.includes('/jobs/') || location.pathname.includes('/applications/') || location.pathname.includes('/chat/');
-  const showNav = isAuthenticated && !hideNavPaths.includes(location.pathname) && !isDetailsPage && location.pathname !== '/';
+  const isDetailsPage =
+    location.pathname.includes('/jobs/') ||
+    location.pathname.includes('/applications/') ||
+    location.pathname.includes('/chat/');
+
+  const showNav =
+    isAuthenticated &&
+    !HIDE_NAV_PATHS.includes(location.pathname) &&
+    !isDetailsPage &&
+    location.pathname !== '/' &&
+    !isPendingApproval;
 
   if (isPendingApproval) {
     return (
@@ -71,10 +132,9 @@ export const AppShell: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-white font-sans transition-colors duration-200">
-      {/* Page content animates on route change */}
       <AnimatePresence mode="wait">
         <motion.main
-          key={location.pathname}
+          key={location.pathname + location.search}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
@@ -84,8 +144,6 @@ export const AppShell: React.FC = () => {
           <Outlet />
         </motion.main>
       </AnimatePresence>
-
-      {/* Nav sits OUTSIDE AnimatePresence — stays perfectly still during page transitions */}
       {showNav && (
         <>
           <BottomNav />
@@ -96,15 +154,11 @@ export const AppShell: React.FC = () => {
               onClick={() => navigate('/post-job')}
               className="fixed bottom-[90px] right-6 w-14 h-14 bg-primary-600 text-white rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(26,115,232,0.4)] z-50"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             </motion.button>
           )}
         </>
       )}
-
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );

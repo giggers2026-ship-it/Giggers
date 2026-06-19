@@ -11,8 +11,7 @@ export default function OtpVerify() {
   const [params] = useSearchParams();
   const phone = params.get('phone') || '';
   const role = (params.get('role') || 'worker') as 'worker' | 'employer';
-  const mode = params.get('mode') || 'login'; // 'login' or 'register'
-  // Register fields passed via URL params
+  const mode = params.get('mode') || 'login';
   const regName = params.get('name') || '';
   const regCity = params.get('city') || 'Mumbai';
   const regArea = params.get('area') || '';
@@ -28,43 +27,51 @@ export default function OtpVerify() {
 
   useEffect(() => {
     if (timer > 0) {
-      const t = setTimeout(() => setTimer(s => s - 1), 1000);
+      const t = setTimeout(() => setTimer((s) => s - 1), 1000);
       return () => clearTimeout(t);
-    } else {
-      setCanResend(true);
     }
+    setCanResend(true);
   }, [timer]);
 
   const handleVerify = async () => {
-    if (otp.length < 4) { addToast('Enter 4-digit OTP', 'error'); return; }
+    if (otp.length < 4) {
+      addToast('Enter 4-digit OTP', 'error');
+      return;
+    }
     setIsLoading(true);
-
     try {
-      // verifyOtp signs in via Supabase and fetches/creates the profile
-      const success = await verifyOtp(phone, otp, role);
-
-      if (success) {
-        // For registration mode, also upsert the extended profile data
-        if (mode === 'register') {
-          await registerUser({
-            name: regName,
-            phone,
-            city: regCity,
-            area: regArea,
-            role,
-            companyName: role === 'employer' ? regCompany : undefined,
-          });
-        }
-
-        setVerified(true);
-        addToast(mode === 'register' ? 'Account created successfully 🎉' : 'Welcome back! 👋', 'success');
-        setTimeout(() => navigate('/home'), 1800);
+      if (mode === 'register') {
+        await registerUser({
+          name: regName,
+          phone,
+          city: regCity,
+          area: regArea,
+          role,
+          otp,
+          companyName: role === 'employer' ? regCompany : undefined,
+        });
       } else {
-        addToast('Invalid OTP. Please check your SMS.', 'error');
+        await verifyOtp(phone, otp, role);
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Verification failed';
-      addToast(message, 'error');
+
+      setVerified(true);
+
+      if (mode === 'register') {
+        addToast('Account created! Complete your KYC to get started.', 'success');
+        // New user always goes to KYC wizard
+        setTimeout(() => navigate('/kyc', { replace: true }), 1500);
+      } else {
+        addToast('Welcome back!', 'success');
+        // Existing user — AppShell will redirect based on their kyc/approval state
+        setTimeout(() => navigate('/home', { replace: true }), 1500);
+      }
+    } catch (err: any) {
+      if (err?.data?.isNewUser) {
+        addToast('No account found. Please register first.', 'error');
+        setTimeout(() => navigate('/register'), 1500);
+      } else {
+        addToast(err instanceof Error ? err.message : 'Verification failed', 'error');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +82,7 @@ export default function OtpVerify() {
     setCanResend(false);
     try {
       await sendOtp(phone);
-      addToast('OTP resent to your phone 📲', 'info');
+      addToast('OTP resent to your phone', 'info');
     } catch {
       addToast('Failed to resend OTP', 'error');
     }
@@ -88,7 +95,7 @@ export default function OtpVerify() {
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: [0, 1.2, 1], opacity: 1 }}
-            transition={{ duration: 0.6, times: [0, 0.6, 1], ease: "easeOut" }}
+            transition={{ duration: 0.6, times: [0, 0.6, 1], ease: 'easeOut' }}
             className="absolute inset-0 bg-emerald-100 dark:bg-emerald-900/30 rounded-full blur-xl"
           />
           <motion.svg
@@ -104,7 +111,7 @@ export default function OtpVerify() {
               fill="none" stroke="#10b981" strokeWidth="5"
               variants={{
                 hidden: { pathLength: 0, opacity: 0 },
-                visible: { pathLength: 1, opacity: 1, transition: { duration: 0.7, ease: "easeInOut" } }
+                visible: { pathLength: 1, opacity: 1, transition: { duration: 0.7, ease: 'easeInOut' } },
               }}
             />
             <motion.path
@@ -113,7 +120,7 @@ export default function OtpVerify() {
               strokeLinecap="round" strokeLinejoin="round"
               variants={{
                 hidden: { pathLength: 0, opacity: 0 },
-                visible: { pathLength: 1, opacity: 1, transition: { duration: 0.4, delay: 0.6, ease: "easeOut" } }
+                visible: { pathLength: 1, opacity: 1, transition: { duration: 0.4, delay: 0.6, ease: 'easeOut' } },
               }}
             />
           </motion.svg>
@@ -125,10 +132,10 @@ export default function OtpVerify() {
           className="text-center"
         >
           <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">
-            Authentication Complete
+            {mode === 'register' ? 'Account Created!' : 'Welcome Back!'}
           </h2>
           <p className="text-slate-500 dark:text-slate-400 font-medium">
-            Redirecting to your dashboard...
+            {mode === 'register' ? 'Opening KYC verification…' : 'Redirecting to your dashboard…'}
           </p>
         </motion.div>
       </div>
@@ -145,7 +152,7 @@ export default function OtpVerify() {
         >
           <ArrowLeft size={18} className="text-white" />
         </button>
-        <h1 className="text-3xl font-black text-white mb-2">Enter OTP 🔐</h1>
+        <h1 className="text-3xl font-black text-white mb-2">Enter OTP</h1>
         <p className="text-white/70 font-medium">Sent to {phone}</p>
       </div>
 
@@ -159,11 +166,7 @@ export default function OtpVerify() {
             We sent a 4-digit code to
           </p>
           <p className="text-base font-extrabold text-slate-900 dark:text-white">{phone}</p>
-          {phone === '9999999999' || phone === '+919999999999' ? (
-            <p className="text-xs text-amber-600 mt-2 font-bold">Mock OTP is 1234</p>
-          ) : (
-            <p className="text-xs text-slate-400 mt-1 font-medium">Check your SMS inbox</p>
-          )}
+          <p className="text-xs text-amber-600 mt-2 font-bold">Use OTP: 1234 (testing mode)</p>
         </div>
 
         <OtpInput length={4} value={otp} onChange={setOtp} />

@@ -101,6 +101,7 @@ function mapApplication(row: Record<string, unknown>): Application {
         categories: profilesData.categories as string[] | undefined,
         gender: profilesData.gender as 'male' | 'female' | 'other' | undefined,
         age: profilesData.age as number | undefined,
+        kycStatus: ((profilesData.kyc_status as string) || 'not_started') as 'not_started' | 'submitted' | 'approved' | 'rejected',
       }
     : undefined;
 

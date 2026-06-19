@@ -16,6 +16,8 @@ export interface AuthState {
 
 // ── User Profile ──────────────────────────────────────────────
 
+export type KycStatus = 'not_started' | 'submitted' | 'approved' | 'rejected';
+
 export interface Profile {
   id: string;
   name: string;
@@ -29,15 +31,26 @@ export interface Profile {
   ban_reason?: string;
   aadhaar_verified: boolean;
   selfie_verified: boolean;
+  aadhaar_number?: string;
+  aadhaar_front_url?: string;
+  aadhaar_back_url?: string;
+  pan_number?: string;
+  pan_front_url?: string;
+  pan_back_url?: string;
+  selfie_url?: string;
   city: string;
   area: string;
+  company_name?: string;
+  kyc_status: KycStatus;
+  kyc_submitted_at?: string;
+  kyc_reviewed_at?: string;
+  kyc_rejection_reason?: string;
   created_at: string;
   completed_jobs: number;
   total_jobs_posted: number;
   rating: number;
   review_count: number;
   total_earnings: number;
-  company_name?: string;
   is_verified_employer?: boolean;
 }
 
@@ -100,21 +113,43 @@ export interface Transaction {
 // ── KYC ──────────────────────────────────────────────────────
 
 export type KYCStatus = 'pending' | 'approved' | 'rejected';
-export type KYCType = 'aadhaar' | 'selfie';
+export type KYCType = 'identity';
 
 export interface KYCDocument {
   id: string;
   user_id: string;
   type: KYCType;
   status: KYCStatus;
+  /** Submitted personal info */
+  full_name?: string;
+  city?: string;
+  area?: string;
+  company_name?: string;
+  /** Aadhaar */
+  aadhaar_number?: string;
   front_url?: string;
   back_url?: string;
+  /** PAN */
+  pan_number?: string;
+  pan_front_url?: string;
+  pan_back_url?: string;
+  /** Selfie */
   selfie_url?: string;
-  aadhaar_number?: string;
   rejection_reason?: string;
   submitted_at: string;
   reviewed_at?: string;
-  profiles?: { name: string; email: string; avatar?: string };
+  /** Joined profile data */
+  profiles?: {
+    name: string;
+    email: string;
+    phone?: string;
+    avatar?: string;
+    role?: 'worker' | 'employer';
+    city?: string;
+    area?: string;
+    company_name?: string;
+    kyc_status?: string;
+  };
 }
 
 // ── Analytics ─────────────────────────────────────────────────

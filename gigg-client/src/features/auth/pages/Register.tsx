@@ -120,7 +120,7 @@ export default function Register() {
                 <Input label="Full Name *" placeholder="Enter your full name" value={name} onChange={e => setName(e.target.value)} leftIcon={<User size={16} />} />
                 <div>
                   <Input label="Phone Number *" type="tel" placeholder="9999999999" value={phone} onChange={e => setPhone(e.target.value)} leftIcon={<Phone size={16} />} />
-                  <p className="text-xs text-amber-600 mt-1 ml-1">Use <strong>9999999999</strong> for testing without SMS.</p>
+                  <p className="text-xs text-amber-600 mt-1 ml-1">Any 10-digit number works. OTP will be <strong>1234</strong>.</p>
                 </div>
                 
                 {role === 'employer' && (

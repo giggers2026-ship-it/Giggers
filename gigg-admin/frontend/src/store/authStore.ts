@@ -9,10 +9,12 @@ interface AuthStore {
   refreshToken: string | null;
   isLoading: boolean;
   error: string | null;
+  _hasHydrated: boolean;
 
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
+  setHasHydrated: (v: boolean) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -23,6 +25,7 @@ export const useAuthStore = create<AuthStore>()(
       refreshToken: null,
       isLoading: false,
       error: null,
+      _hasHydrated: false,
 
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
@@ -49,6 +52,7 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       clearError: () => set({ error: null }),
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
     }),
     {
       name: 'gigg-admin-auth',
@@ -57,6 +61,9 @@ export const useAuthStore = create<AuthStore>()(
         token: state.token,
         refreshToken: state.refreshToken,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
