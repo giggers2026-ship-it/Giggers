@@ -30,19 +30,16 @@ export const useWalletStore = create<WalletState>()(
         if (!user) return;
         set({ isLoading: true });
 
-        // Use maybeSingle() — returns null instead of 406 when the row doesn't exist yet
+        // maybeSingle() returns null (not 406) when the row doesn't exist yet.
+        // We intentionally do NOT try to create the wallet from the browser —
+        // the Supabase client has no auth session (custom JWT backend) so RLS
+        // would block the write with 401. The backend creates the wallet row
+        // on KYC approval or first payment.
         const { data: walletData } = await supabase
           .from('wallets')
           .select('balance, escrow_balance')
           .eq('user_id', user.id)
           .maybeSingle();
-
-        // Auto-create a zero-balance wallet for brand-new users
-        if (!walletData) {
-          await supabase
-            .from('wallets')
-            .upsert({ user_id: user.id, balance: 0, escrow_balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true });
-        }
 
         const { data: txns } = await supabase
           .from('transactions')
@@ -70,6 +67,7 @@ export const useWalletStore = create<WalletState>()(
           isLoading: false,
         });
       },
+
 
       createTopUpOrder: async (amountRupees: number) => {
         const res = await api.post<{ orderId: string; amount: number; currency: string; keyId: string }>(
