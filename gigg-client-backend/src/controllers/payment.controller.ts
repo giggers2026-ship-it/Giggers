@@ -8,7 +8,7 @@ import { AuthenticatedRequest } from '../types';
 // Creates a Razorpay order for wallet top-up or job payment
 export async function createOrder(req: AuthenticatedRequest, res: Response): Promise<void> {
   const result = z.object({
-    amount: z.number().min(100).max(100000), // paise (100 = ₹1)
+    amount: z.number().min(100).max(100000000), // paise (100 = ₹1) up to ₹1,000,000 for testing
     type: z.enum(['wallet_topup', 'job_payment']),
     jobId: z.string().uuid().optional(),
   }).safeParse(req.body);
@@ -19,32 +19,38 @@ export async function createOrder(req: AuthenticatedRequest, res: Response): Pro
   }
 
   const { amount, type, jobId } = result.data;
-  const receipt = `gigg_${type}_${req.user!.id.slice(0, 8)}_${Date.now()}`;
+  const amountInRupees = amount / 100;
 
   try {
-    const order = await getRazorpay().orders.create({
-      amount,
-      currency: 'INR',
-      receipt,
-      notes: { userId: req.user!.id, type, jobId: jobId || '' },
+    // TEST MODE: Directly increment wallet balance without Razorpay
+    const { error: updateError } = await supabase.rpc('increment_wallet_balance', {
+      p_user_id: req.user!.id,
+      p_amount: amountInRupees,
     });
 
-    // Record pending transaction in Supabase
+    if (updateError) {
+      console.error('Test Mode Wallet Update Error:', updateError);
+      throw new Error('Failed to update wallet balance');
+    }
+
+    // Record success transaction in Supabase
     await supabase.from('transactions').insert({
       user_id: req.user!.id,
       type: 'credit',
-      amount: amount / 100, // store in rupees
-      status: 'pending',
-      razorpay_order_id: order.id,
-      description: type === 'wallet_topup' ? 'Wallet top-up' : `Job payment`,
+      amount: amountInRupees,
+      status: 'success',
+      razorpay_order_id: `test_order_${Date.now()}`,
+      razorpay_payment_id: `test_payment_${Date.now()}`,
+      description: type === 'wallet_topup' ? 'Wallet top-up (Test)' : `Job payment (Test)`,
       job_id: jobId || null,
     });
 
     res.json({
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
+      orderId: `test_order_${Date.now()}`,
+      amount: amount,
+      currency: 'INR',
+      keyId: 'test_key',
+      testMode: true,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to create order' });

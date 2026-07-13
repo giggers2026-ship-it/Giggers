@@ -68,7 +68,7 @@ export default function Landing() {
             {/* Navbar */}
             <nav className="lp-navbar">
                 <div className="lp-container nav-flex gs-fade-down">
-                    <div className="logo">Giggers<span style={{ color: 'var(--primary)' }}>.</span></div>
+                    <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><img src="/logo.png" alt="Giggers" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />Giggers<span style={{ color: 'var(--primary)' }}>.</span></div>
                     <div className="nav-links">
                         <a href="#about">Platform</a>
                         <a href="#services">Services</a>
@@ -213,7 +213,7 @@ export default function Landing() {
             {/* Footer */}
             <footer className="lp-footer">
                 <div className="lp-container text-center">
-                    <div className="logo">Giggers<span style={{ color: 'var(--primary)' }}>.</span></div>
+                    <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: '10px', justifyContent: 'center' }}><img src="/logo.png" alt="Giggers" style={{ width: '32px', height: '32px', borderRadius: '8px' }} />Giggers<span style={{ color: 'var(--primary)' }}>.</span></div>
                     <p>© 2026 Giggers Platform. Neat. Organized. Fast.</p>
                 </div>
             </footer>

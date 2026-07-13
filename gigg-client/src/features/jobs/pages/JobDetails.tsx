@@ -27,11 +27,11 @@ export default function JobDetails() {
 
   // A job is the employer's job if it matches my user ID
   const isEmployerForThisJob = user && job.employerId === user.id;
-  const myApplication = user?.role === 'worker'
+  const jobApplication = user?.role === 'worker'
     ? applications.find((a) => a.jobId === job.id)
     : undefined;
-  const hasApplied = Boolean(myApplication);
-  const isAccepted = myApplication?.status === 'accepted';
+  const hasApplied = jobApplication !== undefined;
+  const isHired = jobApplication?.status === 'hired';
 
   const handleApply = async () => {
     if (!user) return;
@@ -154,12 +154,32 @@ export default function JobDetails() {
             <p className="text-sm font-bold text-slate-900 dark:text-white capitalize">{job.genderPreference}</p>
           </div>
           <div className="p-3 bg-slate-50 dark:bg-dark-700 rounded-xl border border-slate-100 dark:border-dark-600">
+            <p className="text-xs text-slate-500 font-bold mb-1">Payment</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white capitalize">{job.modeOfPayment}</p>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-dark-700 rounded-xl border border-slate-100 dark:border-dark-600">
             <p className="text-xs text-slate-500 font-bold mb-1">Facilities</p>
             <p className="text-sm font-bold text-emerald-600 flex items-center gap-1">
-              {job.foodProvided && <><Utensils size={14} /> Food</>}
+              {job.foodProvided ? <><Utensils size={14} /> Food</> : 'None'}
             </p>
           </div>
         </div>
+        
+        {job.dosAndDonts && (
+          <div className="mt-4">
+            <p className="text-xs text-slate-500 font-bold mb-1">Do's & Don'ts</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">
+              {job.dosAndDonts}
+            </p>
+          </div>
+        )}
+        
+        {job.clientName && (
+          <div className="mt-4">
+            <p className="text-xs text-slate-500 font-bold mb-1">Client Name</p>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">{job.clientName}</p>
+          </div>
+        )}
       </div>
 
       {!isEmployerForThisJob && user?.role !== 'employer' && (
@@ -198,7 +218,7 @@ export default function JobDetails() {
           <div className="text-center py-2 text-sm font-bold text-slate-500 dark:text-slate-400">
             Employers cannot apply for gigs.
           </div>
-        ) : isAccepted ? (
+        ) : isHired ? (
           <div className="flex flex-col gap-3">
             <Button fullWidth size="lg" disabled className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-200">
               <CheckCircle size={18} className="mr-2" /> You're Hired!
@@ -217,8 +237,8 @@ export default function JobDetails() {
           </div>
         ) : hasApplied ? (
           <div className="flex flex-col gap-3">
-            <Button fullWidth size="lg" disabled className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-200">
-              <CheckCircle size={18} className="mr-2" /> Applied Successfully
+            <Button fullWidth size="lg" disabled className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 border-amber-200">
+              <CheckCircle size={18} className="mr-2" /> Waiting for Approval
             </Button>
           </div>
         ) : (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Briefcase, FileText, Activity, Compass, MessageCircle } from 'lucide-react';
+import { Search, Filter, Briefcase, FileText, Activity, Compass, MessageCircle, ShieldAlert } from 'lucide-react';
 import { AppHeader } from '../../../components/layout/Navigation';
 import { JobCard } from '../../../components/shared/Cards';
 import { Button, Input, Modal, Chip, Skeleton, Toggle } from '../../../components/ui';
@@ -81,6 +81,29 @@ export default function Jobs() {
         { id: 'ongoing', label: 'Ongoing', icon: Activity },
       ];
 
+  const kycIncomplete = user && !user.isApproved && (user.kycStatus === 'not_started' || user.kycStatus === 'rejected');
+
+  if (kycIncomplete) {
+    return (
+      <div className="pb-24 bg-slate-50 dark:bg-dark-900 min-h-screen">
+        <AppHeader title="Jobs Hub" />
+        <div className="px-5 pt-16 flex flex-col items-center text-center gap-4">
+          <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+            <ShieldAlert size={36} className="text-amber-500" />
+          </div>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white">KYC Required</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium max-w-xs">
+            Complete your Aadhaar KYC verification to browse and apply for jobs or post gigs.
+          </p>
+          <button onClick={() => navigate('/kyc')}
+            className="mt-2 bg-primary-600 text-white font-extrabold text-sm px-8 py-3 rounded-2xl shadow-lg shadow-primary-500/30">
+            Complete KYC Now
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pb-24 bg-slate-50 dark:bg-dark-900 min-h-screen">
       <AppHeader title="Jobs Hub" />
@@ -156,7 +179,7 @@ export default function Jobs() {
               {isLoading ? (
                 <p className="text-slate-500 text-center py-8">Loading postings...</p>
               ) : myJobs.length > 0 ? (
-                myJobs.map((job) => <JobCard key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />)
+                myJobs.map((job) => <JobCard key={job.id} job={job} onClick={() => navigate(`/assign-work/${job.id}`)} />)
               ) : (
                 <div className="text-center py-16 bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-dark-600 shadow-sm">
                   <div className="w-16 h-16 bg-primary-50 dark:bg-primary-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -183,7 +206,7 @@ export default function Jobs() {
                         <p className="text-xs text-slate-500 mt-1">{app.job.employerName}</p>
                       </div>
                       <div className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg ${
-                        app.status === 'accepted' ? 'bg-emerald-100 text-emerald-700' :
+                        app.status === 'hired' ? 'bg-emerald-100 text-emerald-700' :
                         app.status === 'rejected' ? 'bg-red-100 text-red-700' :
                         app.status === 'completed' ? 'bg-blue-100 text-blue-700' :
                         'bg-amber-100 text-amber-700'
@@ -195,17 +218,25 @@ export default function Jobs() {
                       <span>{app.job.date}</span>
                       <span className="font-black text-slate-900 dark:text-white">₹{app.job.payPerWorker}</span>
                     </div>
-                    {app.status === 'accepted' && user && (
-                      <button
-                        onClick={async () => {
-                          const threadId = await fetchChatThreadId(app.jobId, user.id);
-                          if (threadId) navigate(`/chat/${threadId}`);
-                        }}
-                        className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 text-xs font-bold border border-primary-100 dark:border-primary-800/30"
-                      >
-                        <MessageCircle size={14} />
-                        Chat with Employer
-                      </button>
+                    {app.status === 'hired' && user && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => navigate(`/worker-pipeline/${app.jobId}`)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-primary-600 text-white text-xs font-bold shadow-sm"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Track Job
+                        </button>
+                        <button
+                          onClick={async () => {
+                            const threadId = await fetchChatThreadId(app.jobId, user.id);
+                            if (threadId) navigate(`/chat/${threadId}`);
+                          }}
+                          className="w-10 flex items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-800/30"
+                        >
+                          <MessageCircle size={16} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))

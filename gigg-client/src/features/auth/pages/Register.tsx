@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, User, Phone, MapPin, Briefcase } from 'lucide-react';
 import { useUIStore } from '../../../store/uiStore';
 import { useAuthStore } from '../../../store/authStore';
@@ -8,15 +8,19 @@ import { Button, Input } from '../../../components/ui';
 
 export default function Register() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialRole = (searchParams.get('role') || 'worker') as 'worker' | 'employer';
+  const initialPhone = searchParams.get('phone') || '';
+  
   const [step, setStep] = useState(1);
   const { addToast } = useUIStore();
   const { sendOtp } = useAuthStore();
   const [sending, setSending] = useState(false);
 
   // Form state
-  const [role, setRole] = useState<'worker' | 'employer'>('worker');
+  const [role, setRole] = useState<'worker' | 'employer'>(initialRole);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(initialPhone);
   const [companyName, setCompanyName] = useState('');
   const [city, setCity] = useState('Mumbai');
   const [area, setArea] = useState('');
@@ -65,9 +69,9 @@ export default function Register() {
   return (
     <div className="min-h-screen bg-white dark:bg-dark-900 flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-br from-primary-600 to-indigo-700 px-5 pt-12 pb-20 relative overflow-hidden">
+      <div className="px-5 pt-12 pb-20 relative overflow-hidden" style={{ backgroundColor: '#01133b' }}>
         <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-10 translate-x-10" />
-        <button onClick={() => step > 1 ? setStep(s => s - 1) : navigate(-1)} className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center mb-6 z-10 relative">
+        <button onClick={() => step > 1 ? setStep(s => s - 1) : navigate(-1)} className="w-9 h-9 rounded-xl flex items-center justify-center mb-6 z-10 relative" style={{ backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }}>
           <ArrowLeft size={18} className="text-white" />
         </button>
         <div className="mb-3 relative z-10">
@@ -78,10 +82,13 @@ export default function Register() {
             ))}
           </div>
         </div>
-        <h1 className="text-2xl font-black text-white mb-1 relative z-10">
-          {step === 1 ? 'Create Account' : 'Your Location'}
-        </h1>
-        <p className="text-white/70 font-medium text-sm relative z-10">Join the Giggers marketplace</p>
+        <div className="flex items-center gap-3 mb-2 relative z-10">
+          <img src="/logo.png" alt="Giggers" className="w-10 h-10 rounded-xl" />
+          <h1 className="text-2xl font-black text-white">
+            {step === 1 ? 'Create Account' : 'Your Location'}
+          </h1>
+        </div>
+        <p className="text-white/60 font-medium text-sm relative z-10">Join the Giggers marketplace</p>
       </div>
 
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex-1 bg-white dark:bg-dark-900 rounded-t-3xl -mt-8 px-6 pt-8 pb-8 z-10">
@@ -89,33 +96,7 @@ export default function Register() {
           <motion.div key={step} initial={{ x: 30, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -30, opacity: 0 }} transition={{ duration: 0.2 }} className="flex flex-col gap-4">
             {step === 1 && (
               <>
-                {/* Role Toggle Selector */}
-                <div className="bg-slate-100 dark:bg-dark-800 p-1.5 rounded-2xl flex relative mb-2">
-                  <button
-                    type="button"
-                    onClick={() => setRole('worker')}
-                    className={`flex-1 py-3 text-xs font-black rounded-xl transition-all z-10 flex items-center justify-center gap-2 ${
-                      role === 'worker'
-                        ? 'bg-white dark:bg-dark-700 text-primary-600 shadow-sm'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                  >
-                    <User size={15} />
-                    Work Searching
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('employer')}
-                    className={`flex-1 py-3 text-xs font-black rounded-xl transition-all z-10 flex items-center justify-center gap-2 ${
-                      role === 'employer'
-                        ? 'bg-white dark:bg-dark-700 text-primary-600 shadow-sm'
-                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
-                    }`}
-                  >
-                    <Briefcase size={15} />
-                    Worker Hiring
-                  </button>
-                </div>
+
 
                 <Input label="Full Name *" placeholder="Enter your full name" value={name} onChange={e => setName(e.target.value)} leftIcon={<User size={16} />} />
                 <div>

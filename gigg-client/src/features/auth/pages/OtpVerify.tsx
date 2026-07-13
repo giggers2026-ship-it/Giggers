@@ -57,18 +57,15 @@ export default function OtpVerify() {
       setVerified(true);
 
       if (mode === 'register') {
-        addToast('Account created! Complete your KYC to get started.', 'success');
-        // New user always goes to KYC wizard
-        setTimeout(() => navigate('/kyc', { replace: true }), 1500);
+        addToast('Account created! Complete KYC from your profile to unlock jobs.', 'success');
       } else {
         addToast('Welcome back!', 'success');
-        // Existing user — AppShell will redirect based on their kyc/approval state
-        setTimeout(() => navigate('/home', { replace: true }), 1500);
       }
+      setTimeout(() => navigate('/home', { replace: true }), 1500);
     } catch (err: any) {
-      if (err?.data?.isNewUser) {
+      if (err?.data?.isNewUser || err?.response?.data?.isNewUser || err?.isNewUser) {
         addToast('No account found. Please register first.', 'error');
-        setTimeout(() => navigate('/register'), 1500);
+        setTimeout(() => navigate(`/register?phone=${encodeURIComponent(phone)}&role=${role}`), 1500);
       } else {
         addToast(err instanceof Error ? err.message : 'Verification failed', 'error');
       }
@@ -135,25 +132,29 @@ export default function OtpVerify() {
             {mode === 'register' ? 'Account Created!' : 'Welcome Back!'}
           </h2>
           <p className="text-slate-500 dark:text-slate-400 font-medium">
-            {mode === 'register' ? 'Opening KYC verification…' : 'Redirecting to your dashboard…'}
+            Redirecting to your dashboard…
           </p>
         </motion.div>
       </div>
     );
   }
 
+  const accentColor = role === 'employer' ? '#2563EB' : '#22C55E';
+
   return (
     <div className="min-h-screen bg-white dark:bg-dark-900 flex flex-col">
-      <div className="bg-gradient-to-br from-primary-600 to-indigo-700 px-5 pt-12 pb-20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-10 translate-x-10" />
+      <div className="px-5 pt-12 pb-20 relative overflow-hidden" style={{ backgroundColor: '#0F172A' }}>
+        <div className="absolute top-0 right-0 w-48 h-48 rounded-full -translate-y-10 translate-x-10 opacity-10"
+          style={{ background: `radial-gradient(circle, ${accentColor}, transparent)` }} />
         <button
           onClick={() => navigate(-1)}
-          className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center mb-6"
+          className="w-9 h-9 rounded-xl flex items-center justify-center mb-6"
+          style={{ backgroundColor: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.15)' }}
         >
           <ArrowLeft size={18} className="text-white" />
         </button>
         <h1 className="text-3xl font-black text-white mb-2">Enter OTP</h1>
-        <p className="text-white/70 font-medium">Sent to {phone}</p>
+        <p className="font-medium" style={{ color: '#64748B' }}>Sent to {phone}</p>
       </div>
 
       <motion.div

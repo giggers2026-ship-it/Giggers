@@ -41,19 +41,7 @@ export const AppShell: React.FC = () => {
     }
   }, [isAuthenticated, refreshUser]);
 
-  // 3. KYC gate: new user or rejected → must complete KYC
-  useEffect(() => {
-    if (
-      isAuthenticated &&
-      user &&
-      !user.isApproved &&
-      (user.kycStatus === 'not_started' || user.kycStatus === 'rejected') &&
-      !isPublicPath &&
-      !isOnboardingPath
-    ) {
-      navigate('/kyc', { replace: true });
-    }
-  }, [isAuthenticated, user, isPublicPath, isOnboardingPath, navigate]);
+  // 3. KYC gate removed — users can browse home freely, jobs are gated individually
 
   // 4. Already submitted but on /kyc → push to /pending
   useEffect(() => {
@@ -119,9 +107,11 @@ export const AppShell: React.FC = () => {
     location.pathname !== '/' &&
     !isPendingApproval;
 
+  const themeClass = user?.role === 'employer' ? 'theme-employer' : '';
+
   if (isPendingApproval) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-white font-sans transition-colors duration-200">
+      <div className={`min-h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-white font-sans transition-colors duration-200 ${themeClass}`}>
         <div className="max-w-lg mx-auto bg-white dark:bg-dark-900 min-h-screen relative shadow-2xl overflow-x-hidden">
           <PendingApproval />
         </div>
@@ -131,7 +121,7 @@ export const AppShell: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-white font-sans transition-colors duration-200">
+    <div className={`min-h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-white font-sans transition-colors duration-200 ${themeClass}`}>
       <AnimatePresence mode="wait">
         <motion.main
           key={location.pathname + location.search}

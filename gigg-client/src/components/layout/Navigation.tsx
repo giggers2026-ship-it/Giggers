@@ -9,44 +9,55 @@ import { useNotificationStore } from '../../store/notificationStore';
 // ============================================================
 // UNIFIED BOTTOM NAV
 // ============================================================
-const TABS = [
+const WORKER_TABS = [
   { path: '/home',     icon: Home,          label: 'Home' },
+  { path: '/jobs',     icon: Briefcase,     label: 'My Jobs' },
+  { path: '/wallet',   icon: Wallet,        label: 'Earnings' },
+  { path: '/chat',     icon: MessageSquare, label: 'Messages' },
+  { path: '/profile',  icon: User,          label: 'Profile' },
+];
+
+const EMPLOYER_TABS = [
+  { path: '/home',     icon: Home,          label: 'Dashboard' },
   { path: '/jobs',     icon: Briefcase,     label: 'Jobs' },
-  { path: '/wallet',   icon: Wallet,        label: 'Wallet' },
+  { path: '/workers',  icon: User,          label: 'Workers' },
   { path: '/chat',     icon: MessageSquare, label: 'Messages' },
   { path: '/profile',  icon: User,          label: 'Profile' },
 ];
 
 export const BottomNav: React.FC = () => {
   const { unreadCount } = useNotificationStore();
+  const { user } = useAuthStore();
   const location = useLocation();
 
+  const tabs = user?.role === 'employer' ? EMPLOYER_TABS : WORKER_TABS;
+
   return (
-    <nav className="bottom-nav h-20 bg-white dark:bg-dark-800 border-t border-slate-100 dark:border-dark-600 fixed bottom-0 w-full z-50">
+    <nav className="bottom-nav h-[72px] bg-white dark:bg-dark-800 border-t border-slate-100 dark:border-dark-600 fixed bottom-0 w-full z-50">
       <div className="flex justify-around items-center h-full max-w-lg mx-auto px-2">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = location.pathname.startsWith(tab.path);
           const Icon = tab.icon;
 
           return (
-            <NavLink key={tab.path} to={tab.path} className="flex flex-col items-center gap-1 relative py-1 px-3">
+            <NavLink key={tab.path} to={tab.path} className="flex flex-col items-center gap-1.5 relative py-1 px-3">
               {({ isActive: navActive }) => {
                 const active = navActive || isActive;
                 return (
                   <>
                     <div className="relative">
                       <Icon
-                        size={24}
-                        strokeWidth={active ? 3 : 2}
-                        className={clsx('transition-colors duration-200', active ? 'text-primary-600' : 'text-slate-400 dark:text-slate-500')}
+                        size={22}
+                        strokeWidth={active ? 2.5 : 2}
+                        className={clsx('transition-colors duration-200', active ? (user?.role === 'employer' ? 'text-blue-600' : 'text-green-600') : 'text-slate-400 dark:text-slate-500')}
                       />
                       {tab.path === '/chat' && unreadCount > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border border-white">
                           {unreadCount > 9 ? '9+' : unreadCount}
                         </span>
                       )}
                     </div>
-                    <span className={clsx('text-[11px] font-bold transition-colors duration-200', active ? 'text-primary-600' : 'text-slate-400 dark:text-slate-500')}>
+                    <span className={clsx('text-[10px] font-bold transition-colors duration-200', active ? (user?.role === 'employer' ? 'text-blue-600' : 'text-green-600') : 'text-slate-400 dark:text-slate-500')}>
                       {tab.label}
                     </span>
                   </>
@@ -108,17 +119,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 // ============================================================
 export const HomeHeader: React.FC<{ name: string; city: string; avatar?: string }> = ({ name, city, avatar }) => {
   return (
-    <header className="bg-primary-600 min-h-[120px] px-[25px] pt-[35px] pb-[50px] text-white flex justify-between items-center rounded-b-[32px] shrink-0 relative z-40 shadow-sm">
-      <div className="flex flex-col">
-        <h1 className="text-[1.8rem] font-extrabold leading-tight">Giggers<span className="text-primary-100">.</span></h1>
-        <p className="text-[0.85rem] font-semibold opacity-80 mt-1">📍 {city}</p>
+    <header className="min-h-[120px] px-[25px] pt-[35px] pb-[50px] text-white flex justify-between items-center rounded-b-[32px] shrink-0 relative z-40 shadow-sm" style={{ backgroundColor: '#01133b' }}>
+      <div className="flex items-center gap-3">
+        <img src="/logo.png" alt="Giggers" className="w-10 h-10 rounded-xl" />
+        <div className="flex flex-col">
+          <h1 className="text-[1.5rem] font-extrabold leading-tight">Giggers</h1>
+          <p className="text-[0.75rem] font-semibold opacity-60 mt-0.5">📍 {city}</p>
+        </div>
       </div>
       <div className="flex items-center gap-3">
         <NavLink to="/profile" className="w-[42px] h-[42px] rounded-full border-[3px] border-white/40 overflow-hidden bg-white shadow-sm flex items-center justify-center">
           {avatar ? (
             <img src={avatar} alt={name} className="w-full h-full object-cover" />
           ) : (
-            <span className="font-black text-primary-600 text-[1.2rem]">{name.charAt(0)}</span>
+            <span className="font-black text-[1.2rem]" style={{ color: '#01133b' }}>{name.charAt(0)}</span>
           )}
         </NavLink>
       </div>

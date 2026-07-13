@@ -6,6 +6,7 @@ import { Button, Badge, Modal, Input } from '../../../components/ui';
 import { useAuthStore } from '../../../store/authStore';
 import { useWalletStore } from '../../../store/walletStore';
 import { useUIStore } from '../../../store/uiStore';
+import { supabase } from '../../../lib/supabase';
 import { ArrowUpRight, ArrowDownLeft, Shield, Landmark, History } from 'lucide-react';
 
 declare global {
@@ -45,37 +46,22 @@ export default function Wallet() {
 
     setPaying(true);
     try {
-      const loaded = await loadRazorpayScript();
-      if (!loaded) { addToast('Payment service unavailable', 'error'); return; }
+      if (!user) throw new Error("Not logged in");
 
-      const order = await createTopUpOrder(val);
+      // Backend now handles the Test Mode top-up directly and securely
+      await createTopUpOrder(val);
 
-      const options = {
-        key: order.keyId,
-        amount: order.amount,
-        currency: order.currency,
-        name: 'Gigg',
-        description: 'Wallet Top-up',
-        order_id: order.orderId,
-        handler: async (response: any) => {
-          try {
-            await verifyTopUp(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
-            addToast(`₹${val} added to wallet!`, 'success');
-            setShowAddModal(false);
-            setAmount('');
-          } catch {
-            addToast('Payment verification failed', 'error');
-          }
-        },
-        prefill: { name: user?.name, contact: user?.phone },
-        theme: { color: '#1a73e8' },
-        modal: { ondismiss: () => setPaying(false) },
-      };
-
-      new window.Razorpay(options).open();
+      // Simulate a small delay for realistic UX
+      setTimeout(() => {
+        addToast(`₹${val} added to wallet (Test Mode)!`, 'success');
+        setShowAddModal(false);
+        setAmount('');
+        fetchWallet();
+        setPaying(false);
+      }, 800);
+      
     } catch (err: any) {
       addToast(err.message || 'Failed to initiate payment', 'error');
-    } finally {
       setPaying(false);
     }
   };
@@ -195,11 +181,10 @@ export default function Wallet() {
             ))}
           </div>
           <Button fullWidth size="lg" onClick={handleAddMoney} disabled={paying || !amount}>
-            {paying ? 'Processing...' : `Pay ₹${amount || '0'} via Razorpay`}
+            {paying ? 'Processing...' : `Pay ₹${amount || '0'} (Test Mode)`}
           </Button>
-          <p className="text-xs text-center text-slate-400">
-            <Shield size={11} className="inline mr-1" />
-            Secured by Razorpay. UPI · Cards · Netbanking
+          <p className="text-center text-[10px] text-slate-400 mt-3 font-semibold flex items-center justify-center gap-1">
+            <Shield size={12} /> Test Payment Mode Enabled
           </p>
         </div>
       </Modal>

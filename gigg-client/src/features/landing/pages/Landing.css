@@ -23,9 +23,9 @@ body:has(.landing-page) {
     --primary: #F2B759;
     --primary-light: #fbe5c5;
     --primary-dark: #d99a3d;
-    --secondary: #0A4A3C;
-    --secondary-light: #126b58;
-    --secondary-dark: #05261f;
+    --secondary: #01133b;
+    --secondary-light: #0a2a5c;
+    --secondary-dark: #000b24;
     --border-color: #e5eceb;
     --font-primary: 'Plus Jakarta Sans', sans-serif;
 
