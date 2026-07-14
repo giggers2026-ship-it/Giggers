@@ -1,0 +1,16 @@
+{
+  "short_name": "Giggers",
+  "name": "Giggers - Find Workers Instantly",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/home",
+  "background_color": "#ffffff",
+  "theme_color": "#01133b",
+  "display": "standalone",
+  "orientation": "portrait-primary"
+}
