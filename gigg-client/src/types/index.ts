@@ -84,6 +84,14 @@ export interface Job {
   createdAt: string;
   applicantsCount: number;
   distance?: number;
+  // New Fields from PDF
+  needLocationBasedWorkers: boolean;
+  natureOfWork: string;
+  clientName: string;
+  clientId: string;
+  modeOfPayment: 'Online' | 'Cash' | 'Wallet';
+  paymentDate: string;
+  dosAndDonts: string;
 }
 
 export type JobStatus = 'draft' | 'active' | 'completed' | 'cancelled';

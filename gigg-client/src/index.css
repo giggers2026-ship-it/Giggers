@@ -3,14 +3,45 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Brand theme: Giggers Dark Navy #01133b ── */
   :root {
-    --color-primary: 99 102 241;
+    --color-primary-50:  235 238 245;
+    --color-primary-100: 210 218 235;
+    --color-primary-200: 170 185 215;
+    --color-primary-300: 120 145 190;
+    --color-primary-400: 60 95 155;
+    --color-primary-500: 1 19 59;
+    --color-primary-600: 1 15 48;
+    --color-primary-700: 1 12 38;
+    --color-primary-800: 1 9 30;
+    --color-primary-900: 0 7 22;
+    --color-primary-950: 0 4 14;
+
+    /* Role accent colors */
+    --color-worker-accent: 34 197 94;
+    --color-employer-accent: 37 99 235;
+
     --color-accent: 245 158 11;
     --color-success: 16 185 129;
     --color-danger: 239 68 68;
     --radius-card: 1.25rem;
     --nav-height: 72px;
     --header-height: 64px;
+  }
+
+  /* ── Employer theme override ── */
+  .theme-employer {
+    --color-primary-50:  235 238 245;
+    --color-primary-100: 210 218 235;
+    --color-primary-200: 170 185 215;
+    --color-primary-300: 120 145 190;
+    --color-primary-400: 60 95 155;
+    --color-primary-500: 1 19 59;
+    --color-primary-600: 1 15 48;
+    --color-primary-700: 1 12 38;
+    --color-primary-800: 1 9 30;
+    --color-primary-900: 0 7 22;
+    --color-primary-950: 0 4 14;
   }
 
   * {

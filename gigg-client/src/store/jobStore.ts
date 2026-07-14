@@ -26,6 +26,7 @@ interface JobState {
   fetchJobCandidates: (jobId: string) => Promise<void>;
   hireWorker: (jobId: string, applicationId: string) => Promise<void>;
   fetchChatThreadId: (jobId: string, workerId: string) => Promise<string | null>;
+  updatePipelineStep: (applicationId: string, stepId: string) => Promise<void>;
 }
 
 const defaultFilters: FilterState = {
@@ -66,6 +67,13 @@ function mapJob(row: Record<string, unknown>): Job {
     isUrgent: Boolean(row.is_urgent),
     createdAt: (row.created_at as string) || new Date().toISOString(),
     applicantsCount: Number(row.applicants_count) || 0,
+    needLocationBasedWorkers: Boolean(row.need_location_based_workers),
+    natureOfWork: (row.nature_of_work as string) || '',
+    clientName: (row.client_name as string) || '',
+    clientId: (row.client_id as string) || '',
+    modeOfPayment: (row.mode_of_payment as 'Online' | 'Cash' | 'Wallet') || 'Wallet',
+    paymentDate: (row.payment_date as string) || '',
+    dosAndDonts: (row.dos_and_donts as string) || '',
   };
 }
 
@@ -115,6 +123,10 @@ function mapApplication(row: Record<string, unknown>): Application {
     workerRating: Number(profilesData?.rating) || 0,
     workerProfile,
     status: (row.status as Application['status']) || 'applied',
+    reportingCompleted: Boolean(row.reporting_completed),
+    selfieCompleted: Boolean(row.selfie_completed),
+    tshirtCompleted: Boolean(row.tshirt_completed),
+    shoesCompleted: Boolean(row.shoes_completed),
     appliedAt: (row.applied_at as string) || new Date().toISOString(),
     updatedAt: (row.updated_at as string) || new Date().toISOString(),
   };
@@ -255,6 +267,13 @@ export const useJobStore = create<JobState>((set, get) => ({
         is_featured: false,
         is_urgent: data.isUrgent || false,
         applicants_count: 0,
+        need_location_based_workers: data.needLocationBasedWorkers || false,
+        nature_of_work: data.natureOfWork || '',
+        client_name: data.clientName || '',
+        client_id: data.clientId || '',
+        mode_of_payment: data.modeOfPayment || 'Online',
+        payment_date: data.paymentDate || '',
+        dos_and_donts: data.dosAndDonts || '',
       })
       .select()
       .single();
@@ -319,13 +338,13 @@ export const useJobStore = create<JobState>((set, get) => ({
           : j
       ),
       jobCandidates: s.jobCandidates.map((c) =>
-        c.id === applicationId ? { ...c, status: 'accepted' as const } : c
+        c.id === applicationId ? { ...c, status: 'hired' as const } : c
       ),
     }));
 
     await supabase
       .from('applications')
-      .update({ status: 'accepted', updated_at: new Date().toISOString() })
+      .update({ status: 'hired', updated_at: new Date().toISOString() })
       .eq('id', applicationId);
 
     await supabase.rpc('increment_workers_hired', { job_id: jobId });
@@ -354,5 +373,50 @@ export const useJobStore = create<JobState>((set, get) => ({
         is_read: false,
       });
     }
+  },
+
+  /** Update pipeline tracking step for an application */
+  updatePipelineStep: async (applicationId, stepId) => {
+    // Map stepId to database column
+    const stepColumnMap: Record<string, string> = {
+      reporting: 'reporting_completed',
+      selfie: 'selfie_completed',
+      tshirt: 'tshirt_completed',
+      shoes: 'shoes_completed'
+    };
+
+    const column = stepColumnMap[stepId];
+    if (!column) return;
+
+    // Optimistic update
+    set((s) => ({
+      applications: s.applications.map((app) =>
+        app.id === applicationId
+          ? {
+              ...app,
+              reportingCompleted: stepId === 'reporting' ? true : app.reportingCompleted,
+              selfieCompleted: stepId === 'selfie' ? true : app.selfieCompleted,
+              tshirtCompleted: stepId === 'tshirt' ? true : app.tshirtCompleted,
+              shoesCompleted: stepId === 'shoes' ? true : app.shoesCompleted,
+            }
+          : app
+      ),
+      jobCandidates: s.jobCandidates.map((app) =>
+        app.id === applicationId
+          ? {
+              ...app,
+              reportingCompleted: stepId === 'reporting' ? true : app.reportingCompleted,
+              selfieCompleted: stepId === 'selfie' ? true : app.selfieCompleted,
+              tshirtCompleted: stepId === 'tshirt' ? true : app.tshirtCompleted,
+              shoesCompleted: stepId === 'shoes' ? true : app.shoesCompleted,
+            }
+          : app
+      ),
+    }));
+
+    await supabase
+      .from('applications')
+      .update({ [column]: true, updated_at: new Date().toISOString() })
+      .eq('id', applicationId);
   },
 }));

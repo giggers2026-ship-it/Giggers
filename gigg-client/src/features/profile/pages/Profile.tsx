@@ -653,7 +653,7 @@ export default function Profile() {
 
   const [modal, setModal] = useState<null | 'edit' | 'skills' | 'settings' | 'help' | 'verify'>(null);
 
-
+  // KYC is shown inline on this page — no redirect needed
 
   if (!user) return null;
 
@@ -703,6 +703,70 @@ export default function Profile() {
       </div>
 
       <div className="px-5 -mt-16 relative z-10">
+
+        {/* ── KYC Status Banner — always visible at the top ── */}
+        <motion.div
+          initial={{ y: -10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.05 }}
+          onClick={() => {
+            if (user.kycStatus === 'not_started' || user.kycStatus === 'rejected') navigate('/kyc');
+          }}
+          className={`mb-4 rounded-2xl p-4 flex items-center gap-4 ${
+            user.kycStatus === 'not_started' || user.kycStatus === 'rejected' ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''
+          } ${
+            user.isApproved
+              ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50'
+              : user.kycStatus === 'submitted'
+              ? 'bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800/50'
+              : user.kycStatus === 'rejected'
+              ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50'
+              : 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50'
+          }`}
+        >
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+            user.isApproved ? 'bg-emerald-100 dark:bg-emerald-800/50 text-emerald-600'
+            : user.kycStatus === 'submitted' ? 'bg-sky-100 dark:bg-sky-800/50 text-sky-600'
+            : user.kycStatus === 'rejected' ? 'bg-red-100 dark:bg-red-800/50 text-red-600'
+            : 'bg-amber-100 dark:bg-amber-800/50 text-amber-600'
+          }`}>
+            <Shield size={22} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`font-black text-sm ${
+              user.isApproved ? 'text-emerald-900 dark:text-emerald-300'
+              : user.kycStatus === 'submitted' ? 'text-sky-900 dark:text-sky-300'
+              : user.kycStatus === 'rejected' ? 'text-red-900 dark:text-red-300'
+              : 'text-amber-900 dark:text-amber-300'
+            }`}>
+              {user.isApproved ? 'Identity Verified'
+                : user.kycStatus === 'submitted' ? 'KYC Under Review'
+                : user.kycStatus === 'rejected' ? 'KYC Rejected — Retry'
+                : 'Complete KYC to Unlock Jobs'}
+            </p>
+            <p className={`text-[11px] font-medium mt-0.5 ${
+              user.isApproved ? 'text-emerald-700 dark:text-emerald-500'
+              : user.kycStatus === 'submitted' ? 'text-sky-700 dark:text-sky-500'
+              : user.kycStatus === 'rejected' ? 'text-red-700 dark:text-red-500'
+              : 'text-amber-700 dark:text-amber-500'
+            }`}>
+              {user.isApproved ? 'Aadhaar & selfie approved — full access unlocked'
+                : user.kycStatus === 'submitted' ? 'Awaiting admin approval, usually within 24 hours'
+                : user.kycStatus === 'rejected' ? (user.kycRejectionReason || 'Tap to correct and resubmit documents')
+                : 'Tap here to submit your Aadhaar & take a selfie'}
+            </p>
+          </div>
+          {(user.kycStatus === 'not_started' || user.kycStatus === 'rejected') && (
+            <ChevronRight size={18} className={user.kycStatus === 'rejected' ? 'text-red-400' : 'text-amber-400'} />
+          )}
+          {user.kycStatus === 'submitted' && (
+            <span className="text-[10px] font-black text-sky-600 bg-sky-100 dark:bg-sky-800/50 px-2.5 py-1 rounded-full flex-shrink-0">Pending</span>
+          )}
+          {user.isApproved && (
+            <CheckCircle size={20} className="text-emerald-500 flex-shrink-0" />
+          )}
+        </motion.div>
+
         <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="bg-white dark:bg-dark-700 rounded-3xl p-5 shadow-card-lg border border-slate-100 dark:border-dark-600 mb-6">
           <div className="flex gap-4">
             <Avatar src={user.selfie} name={user.name} size="xl" verified={user.isVerified} />
@@ -772,69 +836,6 @@ export default function Profile() {
           </div>
         </motion.div>
 
-        {/* Verification Status */}
-        <Card
-          onClick={() => {
-            // Only open wizard for not_started or rejected states
-            if (!user.isVerified && user.kycStatus !== 'submitted') {
-              navigate('/kyc');
-            }
-          }}
-          className={`mb-6 flex items-center gap-4 border ${
-            user.isVerified
-              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-100 dark:border-emerald-800/50'
-              : user.kycStatus === 'submitted'
-              ? 'bg-sky-50 dark:bg-sky-900/20 border-sky-100 dark:border-sky-800/50'
-              : user.kycStatus === 'rejected'
-              ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800/50'
-              : 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800/50'
-          }`}
-        >
-          <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-            user.isVerified
-              ? 'bg-emerald-100 dark:bg-emerald-800/50 text-emerald-600'
-              : user.kycStatus === 'submitted'
-              ? 'bg-sky-100 dark:bg-sky-800/50 text-sky-600'
-              : user.kycStatus === 'rejected'
-              ? 'bg-red-100 dark:bg-red-800/50 text-red-600'
-              : 'bg-amber-100 dark:bg-amber-800/50 text-amber-600'
-          }`}>
-            <Shield size={24} />
-          </div>
-          <div className="flex-1">
-            <h3 className={`font-extrabold text-sm ${
-              user.isVerified
-                ? 'text-emerald-900 dark:text-emerald-300'
-                : user.kycStatus === 'submitted'
-                ? 'text-sky-900 dark:text-sky-300'
-                : user.kycStatus === 'rejected'
-                ? 'text-red-900 dark:text-red-300'
-                : 'text-amber-900 dark:text-amber-300'
-            }`}>
-              {user.isVerified ? 'Identity Verified' : user.kycStatus === 'submitted' ? 'KYC Under Review' : user.kycStatus === 'rejected' ? 'KYC Rejected' : 'Complete KYC'}
-            </h3>
-            <p className={`text-xs font-medium ${
-              user.isVerified
-                ? 'text-emerald-700 dark:text-emerald-500'
-                : user.kycStatus === 'submitted'
-                ? 'text-sky-700 dark:text-sky-500'
-                : user.kycStatus === 'rejected'
-                ? 'text-red-700 dark:text-red-500'
-                : 'text-amber-700 dark:text-amber-500'
-            }`}>
-              {user.isVerified
-                ? 'Aadhaar, PAN and selfie approved'
-                : user.kycStatus === 'submitted'
-                ? 'Waiting for admin approval to unlock jobs'
-                : user.kycStatus === 'rejected'
-                ? user.kycRejectionReason || 'Open to correct and resubmit your documents'
-                : 'Submit Aadhaar, PAN and a live selfie'}
-            </p>
-          </div>
-          <Badge variant={user.isVerified ? 'success' : user.kycStatus === 'submitted' ? 'primary' : user.kycStatus === 'rejected' ? 'danger' : 'warning'}>
-            {user.isVerified ? 'Approved' : user.kycStatus === 'submitted' ? 'Pending' : user.kycStatus === 'rejected' ? 'Retry' : 'Required'}
-          </Badge>
-        </Card>
 
         {/* Menu Items */}
         <div className="flex flex-col gap-3 mb-8">
