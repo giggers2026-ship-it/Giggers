@@ -131,7 +131,7 @@ export default function Home() {
           </div>
 
           {/* Floating CTA */}
-          <div className="fixed bottom-24 left-0 right-0 px-5 z-40 max-w-lg mx-auto">
+          <div className="lg:hidden fixed bottom-24 left-0 right-0 px-5 z-40 max-w-lg mx-auto">
             <button 
               onClick={() => navigate('/post-job')}
               className="w-full py-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(37,99,235,0.35)] active:scale-[0.98] transition-all"
@@ -214,7 +214,7 @@ export default function Home() {
           </div>
 
           {/* Floating CTA */}
-          <div className="fixed bottom-24 left-0 right-0 px-5 z-40 max-w-lg mx-auto">
+          <div className="lg:hidden fixed bottom-24 left-0 right-0 px-5 z-40 max-w-lg mx-auto">
             <button 
               onClick={() => navigate('/jobs')}
               className="w-full py-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(22,163,74,0.35)] active:scale-[0.98] transition-all"

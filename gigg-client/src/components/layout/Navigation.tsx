@@ -9,7 +9,7 @@ import { useNotificationStore } from '../../store/notificationStore';
 // ============================================================
 // UNIFIED BOTTOM NAV
 // ============================================================
-const WORKER_TABS = [
+export const WORKER_TABS = [
   { path: '/home',     icon: Home,          label: 'Home' },
   { path: '/jobs',     icon: Briefcase,     label: 'My Jobs' },
   { path: '/wallet',   icon: Wallet,        label: 'Earnings' },
@@ -17,7 +17,7 @@ const WORKER_TABS = [
   { path: '/profile',  icon: User,          label: 'Profile' },
 ];
 
-const EMPLOYER_TABS = [
+export const EMPLOYER_TABS = [
   { path: '/home',     icon: Home,          label: 'Dashboard' },
   { path: '/jobs',     icon: Briefcase,     label: 'Jobs' },
   { path: '/workers',  icon: User,          label: 'Workers' },
@@ -33,7 +33,7 @@ export const BottomNav: React.FC = () => {
   const tabs = user?.role === 'employer' ? EMPLOYER_TABS : WORKER_TABS;
 
   return (
-    <nav className="bottom-nav h-[72px] bg-white dark:bg-dark-800 border-t border-slate-100 dark:border-dark-600 fixed bottom-0 w-full z-50">
+    <nav className="bottom-nav lg:hidden h-[72px] bg-white dark:bg-dark-800 border-t border-slate-100 dark:border-dark-600 fixed bottom-0 w-full z-50">
       <div className="flex justify-around items-center h-full max-w-lg mx-auto px-2">
         {tabs.map((tab) => {
           const isActive = location.pathname.startsWith(tab.path);

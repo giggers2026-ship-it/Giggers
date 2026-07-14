@@ -159,11 +159,13 @@ export default function Jobs() {
                   <div key={i} className="bg-white dark:bg-dark-800 p-4 rounded-2xl flex gap-3 border border-slate-100 dark:border-dark-600"><Skeleton className="w-12 h-12" /><div className="flex-1"><Skeleton className="h-4 w-3/4 mb-2" /><Skeleton className="h-3 w-1/2 mb-3" /><Skeleton className="h-4 w-1/4" /></div></div>
                 ))
               ) : filteredExploreJobs.length > 0 ? (
-                filteredExploreJobs.map((job, i) => (
-                  <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                    <JobCard job={job} onClick={() => navigate(`/jobs/${job.id}`)} saved={savedJobIds.includes(job.id)} onSave={() => savedJobIds.includes(job.id) ? unsaveJob(job.id) : saveJob(job.id)} />
-                  </motion.div>
-                ))
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {filteredExploreJobs.map((job, i) => (
+                    <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                      <JobCard job={job} onClick={() => navigate(`/jobs/${job.id}`)} saved={savedJobIds.includes(job.id)} onSave={() => savedJobIds.includes(job.id) ? unsaveJob(job.id) : saveJob(job.id)} />
+                    </motion.div>
+                  ))}
+                </div>
               ) : (
                 <div className="text-center py-16">
                   <div className="text-5xl mb-4">🔍</div>
@@ -179,7 +181,9 @@ export default function Jobs() {
               {isLoading ? (
                 <p className="text-slate-500 text-center py-8">Loading postings...</p>
               ) : myJobs.length > 0 ? (
-                myJobs.map((job) => <JobCard key={job.id} job={job} onClick={() => navigate(`/assign-work/${job.id}`)} />)
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {myJobs.map((job) => <JobCard key={job.id} job={job} onClick={() => navigate(`/assign-work/${job.id}`)} />)}
+                </div>
               ) : (
                 <div className="text-center py-16 bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-dark-600 shadow-sm">
                   <div className="w-16 h-16 bg-primary-50 dark:bg-primary-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -198,48 +202,50 @@ export default function Jobs() {
               {isLoading ? (
                 <p className="text-slate-500 text-center py-8">Loading applications...</p>
               ) : applications.length > 0 ? (
-                applications.map((app) => (
-                  <div key={app.id} className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-dark-600">
-                    <div className="flex justify-between items-start mb-3 cursor-pointer" onClick={() => navigate(`/jobs/${app.jobId}`)}>
-                      <div>
-                        <h4 className="font-bold text-slate-900 dark:text-white">{app.job.title}</h4>
-                        <p className="text-xs text-slate-500 mt-1">{app.job.employerName}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {applications.map((app) => (
+                    <div key={app.id} className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-dark-600">
+                      <div className="flex justify-between items-start mb-3 cursor-pointer" onClick={() => navigate(`/jobs/${app.jobId}`)}>
+                        <div>
+                          <h4 className="font-bold text-slate-900 dark:text-white">{app.job.title}</h4>
+                          <p className="text-xs text-slate-500 mt-1">{app.job.employerName}</p>
+                        </div>
+                        <div className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg ${
+                          app.status === 'hired' ? 'bg-emerald-100 text-emerald-700' :
+                          app.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                          app.status === 'completed' ? 'bg-blue-100 text-blue-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}>
+                          {app.status}
+                        </div>
                       </div>
-                      <div className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg ${
-                        app.status === 'hired' ? 'bg-emerald-100 text-emerald-700' :
-                        app.status === 'rejected' ? 'bg-red-100 text-red-700' :
-                        app.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                        'bg-amber-100 text-amber-700'
-                      }`}>
-                        {app.status}
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-dark-700 p-2.5 rounded-xl mb-3">
+                        <span>{app.job.date}</span>
+                        <span className="font-black text-slate-900 dark:text-white">₹{app.job.payPerWorker}</span>
                       </div>
+                      {app.status === 'hired' && user && (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => navigate(`/worker-pipeline/${app.jobId}`)}
+                            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-primary-600 text-white text-xs font-bold shadow-sm"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            Track Job
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const threadId = await fetchChatThreadId(app.jobId, user.id);
+                              if (threadId) navigate(`/chat/${threadId}`);
+                            }}
+                            className="w-10 flex items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-800/30"
+                          >
+                            <MessageCircle size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-dark-700 p-2.5 rounded-xl mb-3">
-                      <span>{app.job.date}</span>
-                      <span className="font-black text-slate-900 dark:text-white">₹{app.job.payPerWorker}</span>
-                    </div>
-                    {app.status === 'hired' && user && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => navigate(`/worker-pipeline/${app.jobId}`)}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl bg-primary-600 text-white text-xs font-bold shadow-sm"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          Track Job
-                        </button>
-                        <button
-                          onClick={async () => {
-                            const threadId = await fetchChatThreadId(app.jobId, user.id);
-                            if (threadId) navigate(`/chat/${threadId}`);
-                          }}
-                          className="w-10 flex items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 border border-primary-100 dark:border-primary-800/30"
-                        >
-                          <MessageCircle size={16} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
                 <div className="text-center py-16 bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-dark-600 shadow-sm">
                   <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -258,9 +264,11 @@ export default function Jobs() {
               {isLoading ? (
                 <p className="text-slate-500 text-center py-8">Loading ongoing jobs...</p>
               ) : ongoingJobs.length > 0 ? (
-                ongoingJobs.map((job) => (
-                  <JobCard key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />
-                ))
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {ongoingJobs.map((job) => (
+                    <JobCard key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />
+                  ))}
+                </div>
               ) : (
                 <div className="text-center py-16 bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-dark-600 shadow-sm">
                   <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
