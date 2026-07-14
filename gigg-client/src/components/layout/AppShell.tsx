@@ -124,13 +124,13 @@ export const AppShell: React.FC = () => {
 
   return (
     <div className={`min-h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-white font-sans transition-colors duration-200 ${themeClass}`}>
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait" initial={false}>
         <motion.main
-          key={location.pathname + location.search}
+          key={location.pathname}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.13, ease: 'easeOut' }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
           className="max-w-lg mx-auto bg-white dark:bg-dark-900 min-h-screen relative shadow-2xl overflow-x-hidden"
         >
           <Outlet />

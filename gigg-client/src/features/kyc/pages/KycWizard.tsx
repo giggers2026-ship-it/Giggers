@@ -366,7 +366,14 @@ export default function KycWizard() {
   // Step 4 — Selfie
   const [selfie, setSelfie] = useState<string>(user?.selfie || '');
 
-  const [step, setStep] = useState(1);
+  // If personal info was already filled during signup, skip step 1
+  const personalInfoComplete =
+    !!user?.name?.trim() &&
+    !!user?.city?.trim() &&
+    !!user?.area?.trim() &&
+    (user?.role !== 'employer' || !!user?.companyName?.trim());
+
+  const [step, setStep] = useState(personalInfoComplete ? 2 : 1);
   const [dir, setDir] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -488,7 +495,7 @@ export default function KycWizard() {
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full translate-y-10 -translate-x-10" />
 
         <div className="flex justify-between items-center mb-4 relative z-10">
-          {step > 1 ? (
+          {step > 1 && (!personalInfoComplete || step > 2) ? (
             <button
               onClick={() => goTo(step - 1)}
               className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-white"

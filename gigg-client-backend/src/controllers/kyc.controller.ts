@@ -114,10 +114,6 @@ export async function submitKycHandler(req: AuthenticatedRequest, res: Response)
     pan_front_url: panFront,
     pan_back_url: panBack,
     selfie_url: selfie,
-    aadhaar_verified: false,
-    selfie_verified: false,
-    is_verified: false,
-    is_approved: false,
     kyc_status: 'submitted',
     kyc_submitted_at: submittedAt,
     kyc_reviewed_at: null,
@@ -134,6 +130,7 @@ export async function submitKycHandler(req: AuthenticatedRequest, res: Response)
     .eq('id', userId);
 
   if (updateProfileError) {
+    console.error('[KYC] profile update error:', updateProfileError);
     res.status(500).json({ error: updateProfileError.message });
     return;
   }
@@ -171,6 +168,7 @@ export async function submitKycHandler(req: AuthenticatedRequest, res: Response)
   const { error: kycError } = await kycQuery;
 
   if (kycError) {
+    console.error('[KYC] kyc_documents error:', kycError);
     res.status(500).json({ error: kycError.message });
     return;
   }

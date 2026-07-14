@@ -14,7 +14,6 @@ export default function JobDetails() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { jobs, myJobs, applications, savedJobIds, saveJob, unsaveJob, applyToJob, isLoading, completeJob, jobCandidates, fetchJobCandidates, hireWorker, fetchChatThreadId } = useJobStore();
-  const { releaseEscrow } = useWalletStore();
   const { addToast } = useUIStore();
   const [applying, setApplying] = useState(false);
   const [showCandidatesModal, setShowCandidatesModal] = useState(false);
@@ -203,7 +202,6 @@ export default function JobDetails() {
             {job.status !== 'completed' ? (
               <Button className="flex-1" variant="primary" onClick={() => {
                   completeJob(job.id);
-                  releaseEscrow(job.workersNeeded * job.payPerWorker, job.title);
                   addToast('Job completed! Funds released to worker.', 'success');
               }} rightIcon={<CheckCircle size={18} />}>
                 Complete Job

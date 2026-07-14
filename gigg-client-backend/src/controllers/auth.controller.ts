@@ -29,10 +29,10 @@ function serializeProfile(profile: Record<string, any>) {
     city: profile.city || '',
     area: profile.area || '',
     createdAt: profile.created_at,
-    completedJobs: profile.completed_jobs || 0,
-    totalJobsPosted: profile.total_jobs_posted || 0,
+    completedJobs: profile.completed_jobs ?? 0,
+    totalJobsPosted: profile.total_jobs_posted ?? 0,
     rating: Number(profile.rating) || 0,
-    reviewCount: profile.review_count || 0,
+    reviewCount: profile.review_count ?? 0,
     totalEarnings: Number(profile.total_earnings) || 0,
     attendanceRate: Number(profile.attendance_rate) || 100,
     companyName: profile.company_name || undefined,
@@ -107,30 +107,29 @@ export async function verifyOtpHandler(req: Request, res: Response): Promise<voi
       res.status(400).json({ error: 'New user requires name and role', isNewUser: true });
       return;
     }
-    // INSERT new profile
-    const { data: newProfile, error: insertError } = await supabase
-      .from('profiles')
-      .insert({
-        phone,
-        name,
-        role,
-        city: city || '',
-        area: area || '',
-        company_name: role === 'employer' ? companyName || null : null,
-        is_approved: true,
-        is_verified: true,
-        kyc_status: 'approved'
-      })
-      .select()
-      .single();
+    try {
+      const { data: newProfile, error } = await supabase
+        .from('profiles')
+        .insert({
+          phone,
+          name,
+          role,
+          city: city || '',
+          area: area || '',
+          is_approved: false,
+          is_verified: false,
+          aadhaar_verified: false,
+          selfie_verified: false,
+        })
+        .select('*')
+        .single();
 
-    if (insertError || !newProfile) {
-      res.status(500).json({ error: 'Failed to create new user profile' });
+      if (error || !newProfile) throw error ?? new Error('No profile returned');
+      profile = newProfile;
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to create profile: ' + (err.message || 'Unknown error') });
       return;
     }
-    profile = newProfile;
-    
-    // Also create wallet for new user via RPC or trigger if available, but backend probably has trigger
   } else {
     // If user already exists but selected a different role on login, update it
     if (role && profile.role !== role) {
