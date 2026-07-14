@@ -17,6 +17,7 @@ interface WalletState {
   }>;
   verifyTopUp: (orderId: string, paymentId: string, signature: string) => Promise<void>;
   fetchTransactions: () => Promise<void>;
+  releaseEscrow: (amount: number, description: string) => Promise<void>;
 }
 
 export const useWalletStore = create<WalletState>()(
@@ -91,6 +92,9 @@ export const useWalletStore = create<WalletState>()(
 
       fetchTransactions: async () => {
         await get().fetchWallet();
+      },
+      releaseEscrow: async (amount: number, description: string) => {
+        console.log(`Escrow released: ₹${amount} for ${description}`);
       },
     }),
     {

@@ -95,7 +95,7 @@ export interface Job {
 }
 
 export type JobStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-export type ApplicationStatus = 'applied' | 'shortlisted' | 'accepted' | 'rejected' | 'completed';
+export type ApplicationStatus = 'applied' | 'shortlisted' | 'accepted' | 'rejected' | 'completed' | 'hired';
 
 export interface Application {
   id: string;
@@ -109,6 +109,10 @@ export interface Application {
   status: ApplicationStatus;
   appliedAt: string;
   updatedAt: string;
+  reportingCompleted?: boolean;
+  selfieCompleted?: boolean;
+  tshirtCompleted?: boolean;
+  shoesCompleted?: boolean;
 }
 
 export interface Work {
