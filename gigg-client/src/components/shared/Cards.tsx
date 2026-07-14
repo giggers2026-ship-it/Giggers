@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import type { Job, UserProfile } from '../../types/index';
 import { Badge, Avatar, Rating } from '../ui';
 import { MapPin, Clock, Users, Utensils, Shield, Star, Bookmark } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore';
 
 // ============================================================
 // JOB CARD
@@ -18,11 +17,6 @@ interface JobCardProps {
 }
 
 export const JobCard: React.FC<JobCardProps> = ({ job, onClick, onSave, saved, variant = 'list' }) => {
-  const { user } = useAuthStore();
-  const isWorker = user?.role === 'worker';
-  const accentColor = isWorker ? 'text-green-600' : 'text-blue-600';
-  const accentBg = isWorker ? 'bg-green-50' : 'bg-blue-50';
-
   const statusColor = {
     active:    { variant: 'success' as const, label: 'Hiring' },
     draft:     { variant: 'gray'    as const, label: 'Draft' },
@@ -36,8 +30,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, onSave, saved, v
         whileHover={{ y: -3 }}
         whileTap={{ scale: 0.98 }}
         onClick={onClick}
-        className="flex-shrink-0 w-72 rounded-3xl overflow-hidden cursor-pointer shadow-card-md animate-fade-up"
-        style={{ background: isWorker ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' : 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}
+        className="flex-shrink-0 w-72 rounded-3xl overflow-hidden cursor-pointer shadow-card-md"
+        style={{ background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }}
       >
         <div className="p-5 text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-10 translate-x-10" />
@@ -56,7 +50,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, onSave, saved, v
               <p className="text-white/60 text-[10px] font-bold">PAY</p>
               <p className="text-xl font-black">₹{job.payPerWorker}</p>
             </div>
-            <div className="bg-white text-slate-900 text-xs font-extrabold px-3 py-1.5 rounded-full">Apply Now →</div>
+            <div className="bg-white text-primary-600 text-xs font-extrabold px-3 py-1.5 rounded-full">Apply Now →</div>
           </div>
         </div>
       </motion.div>
@@ -68,18 +62,18 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, onSave, saved, v
       <motion.div
         whileTap={{ scale: 0.97 }}
         onClick={onClick}
-        className="card p-4 cursor-pointer flex flex-col gap-2 hover:shadow-card-md transition-shadow duration-200"
+        className="card p-4 cursor-pointer"
       >
-        <div className="flex justify-between items-start mb-1">
+        <div className="flex justify-between items-start mb-3">
           <span className="text-2xl">{job.categoryEmoji}</span>
           <Badge variant={statusColor.variant}>{statusColor.label}</Badge>
         </div>
-        <h3 className="font-extrabold text-sm text-slate-900 mb-1 leading-tight line-clamp-2">{job.title}</h3>
-        <p className="text-xs text-slate-500 font-semibold mb-1">{job.employerName}</p>
-        <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mb-2">
+        <h3 className="font-extrabold text-sm text-slate-900 dark:text-white mb-1 leading-tight line-clamp-2">{job.title}</h3>
+        <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mb-3">{job.employerName}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1 mb-3">
           <MapPin size={11} /> {job.location}
         </p>
-        <p className={clsx("text-lg font-black mt-auto", accentColor)}>₹{job.payPerWorker}</p>
+        <p className="text-lg font-black text-primary-600 dark:text-primary-400">₹{job.payPerWorker}</p>
       </motion.div>
     );
   }
@@ -89,37 +83,37 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onClick, onSave, saved, v
     <motion.div
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
-      className="card p-4 cursor-pointer relative hover:shadow-card-md transition-shadow duration-200"
+      className="card p-4 cursor-pointer"
     >
       <div className="flex gap-3">
-        <div className={clsx("w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0", accentBg)}>
+        <div className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-2xl flex-shrink-0">
           {job.categoryEmoji}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                {job.isUrgent && <span className="text-[9px] font-black bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">URGENT</span>}
+              <div className="flex items-center gap-2 flex-wrap">
+                {job.isUrgent && <span className="text-[9px] font-black bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-1.5 py-0.5 rounded-full">URGENT</span>}
                 <Badge variant={statusColor.variant} className="text-[10px]">{statusColor.label}</Badge>
               </div>
-              <h3 className="font-extrabold text-sm text-slate-900 leading-tight line-clamp-2">{job.title}</h3>
-              <p className="text-xs text-slate-500 font-semibold mt-1 flex items-center gap-1">
-                {job.isVerifiedEmployer && <Shield size={10} className={isWorker ? "text-green-500" : "text-blue-500"} />}
+              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white mt-0.5 leading-tight line-clamp-2">{job.title}</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold mt-0.5 flex items-center gap-1">
+                {job.isVerifiedEmployer && <Shield size={10} className="text-primary-500" />}
                 {job.employerName}
               </p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className={clsx("text-base font-black", accentColor)}>₹{job.payPerWorker}</p>
+              <p className="text-base font-black text-primary-600 dark:text-primary-400">₹{job.payPerWorker}</p>
               <p className="text-[10px] font-bold text-slate-400">/day</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-2.5 text-xs text-slate-500 font-medium flex-wrap">
+          <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium flex-wrap">
             <span className="flex items-center gap-1"><MapPin size={11} /> {job.location}</span>
             <span className="flex items-center gap-1"><Clock size={11} /> {job.reportingTime}</span>
             <span className="flex items-center gap-1"><Users size={11} /> {job.workersNeeded - job.workersHired} left</span>
           </div>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
-            {job.foodProvided && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600"><Utensils size={10} /> Food</span>}
+            {job.foodProvided && <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400"><Utensils size={10} /> Food</span>}
             <span className="text-[10px] font-bold text-slate-400">{job.applicantsCount} applicants</span>
             {job.distance && <span className="text-[10px] font-bold text-slate-400">📍 {job.distance}km</span>}
           </div>
@@ -180,7 +174,7 @@ export const WorkerCard: React.FC<WorkerCardProps> = ({ worker, onClick, onHire,
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">{worker.name}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{(worker.categories || []).join(', ')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{worker.categories.join(', ')}</p>
             </div>
             <div className="text-right">
               <Rating value={worker.rating} />
@@ -194,7 +188,7 @@ export const WorkerCard: React.FC<WorkerCardProps> = ({ worker, onClick, onHire,
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <Badge variant={worker.isVerified ? 'success' : 'gray'} dot>{worker.isVerified ? 'Verified' : 'Unverified'}</Badge>
             {worker.availableToday && <Badge variant="primary" dot>Available Today</Badge>}
-            {(worker.categories || []).slice(0, 2).map(c => (
+            {worker.categories.slice(0, 2).map(c => (
               <span key={c} className="text-[10px] font-bold bg-slate-100 dark:bg-dark-500 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full">{c}</span>
             ))}
           </div>

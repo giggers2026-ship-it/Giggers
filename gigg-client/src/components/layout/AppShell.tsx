@@ -22,7 +22,7 @@ export const AppShell: React.FC = () => {
   const { isAuthenticated, user, refreshUser } = useAuthStore();
   const { fetchWallet } = useWalletStore();
   const { toasts, removeToast, theme } = useUIStore();
-  const { subscribeToNotifications, fetchNotifications } = useNotificationStore();
+  const { subscribeToNotifications } = useNotificationStore();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -83,11 +83,10 @@ export const AppShell: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      fetchNotifications(user.id);
       const unsubscribe = subscribeToNotifications(user.id);
       return unsubscribe;
     }
-  }, [isAuthenticated, user?.id, subscribeToNotifications, fetchNotifications]);
+  }, [isAuthenticated, user?.id, subscribeToNotifications]);
 
   // Theme
   useEffect(() => {
@@ -133,7 +132,7 @@ export const AppShell: React.FC = () => {
   return (
     <div className={`min-h-screen bg-slate-50 dark:bg-dark-900 text-slate-900 dark:text-white font-sans transition-colors duration-200 ${themeClass}`}>
       {showSidebar && <DesktopSidebar />}
-
+      
       <div className={clsx("min-h-screen flex flex-col", showSidebar && "lg:pl-64")}>
         <AnimatePresence mode="wait">
           <motion.main
@@ -144,15 +143,15 @@ export const AppShell: React.FC = () => {
             transition={{ duration: 0.13, ease: 'easeOut' }}
             className={clsx(
               "bg-white dark:bg-dark-900 min-h-screen relative shadow-2xl overflow-x-hidden w-full",
-              showSidebar
-                ? "max-w-lg lg:max-w-4xl mx-auto lg:my-6 lg:min-h-[calc(100vh-48px)] lg:rounded-3xl lg:shadow-xl lg:border lg:border-slate-100 lg:dark:border-dark-700"
+              showSidebar 
+                ? "max-w-lg lg:max-w-4xl mx-auto lg:my-6 lg:min-h-[calc(100vh-48px)] lg:rounded-3xl lg:shadow-xl lg:border lg:border-slate-100 lg:dark:border-dark-700" 
                 : "max-w-lg mx-auto"
             )}
           >
             <Outlet />
           </motion.main>
         </AnimatePresence>
-
+        
         {showNav && (
           <>
             <BottomNav />

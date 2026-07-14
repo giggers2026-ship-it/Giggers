@@ -7,14 +7,14 @@ import { useJobStore } from '../../../store/jobStore';
 import { useWalletStore } from '../../../store/walletStore';
 import { useUIStore } from '../../../store/uiStore';
 import { useAuthStore } from '../../../store/authStore';
-import { Info, MapPin, Calculator, Wallet, Shield } from 'lucide-react';
+import { Info, MapPin, Calculator, Wallet, Shield, ShieldAlert } from 'lucide-react';
 import { Modal } from '../../../components/ui';
 
 export default function PostJob() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { postJob, isLoading: isJobLoading } = useJobStore();
-  const { wallet } = useWalletStore();
+  const { wallet, fetchWallet } = useWalletStore();
   const { addToast } = useUIStore();
   const [step, setStep] = useState(1);
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -41,7 +41,13 @@ export default function PostJob() {
   const [food, setFood] = useState(false);
   const [dressCode, setDressCode] = useState('Casual');
   const [gender, setGender] = useState('any');
-
+  const [natureOfWork, setNatureOfWork] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [needLocationBasedWorkers, setNeedLocationBasedWorkers] = useState(false);
+  const [modeOfPayment, setModeOfPayment] = useState('Online');
+  const [paymentDate, setPaymentDate] = useState('');
+  const [dosAndDonts, setDosAndDonts] = useState('');
   // Category-specific hints
   const categoryHint = category === 'Catering'
     ? 'e.g. Wedding servers, buffet waitstaff, banquet crew'
@@ -89,16 +95,42 @@ export default function PostJob() {
       title, category, workersNeeded, payPerWorker: Number(payPerWorker),
       date, reportingTime, endTime, location, address, description,
       foodProvided: food, dressCode, genderPreference: gender as any,
+      needLocationBasedWorkers, natureOfWork, clientName, clientId,
+      modeOfPayment: modeOfPayment as any, paymentDate, dosAndDonts
     }, user.id);
+    await fetchWallet();
     addToast('Job posted & funds held in escrow! 🎉', 'success');
     navigate('/jobs?tab=postings');
   };
 
   const handleAddFunds = () => {
     setShowWalletModal(false);
-    addToast(`Please top up your wallet with at least ₹${totalPayable - (wallet?.currentBalance || 0)} to post this job.`, 'info');
     navigate('/wallet');
+    addToast('Add funds to your wallet to post this job', 'info');
   };
+
+  const kycIncomplete = user && !user.isApproved && (user.kycStatus === 'not_started' || user.kycStatus === 'rejected');
+
+  if (kycIncomplete) {
+    return (
+      <div className="pb-24 font-sans bg-slate-50 dark:bg-dark-900 min-h-screen">
+        <AppHeader title="Post a Job" showBack onBack={() => navigate(-1)} />
+        <div className="px-5 pt-16 flex flex-col items-center text-center gap-4">
+          <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+            <ShieldAlert size={36} className="text-amber-500" />
+          </div>
+          <h2 className="text-xl font-black text-slate-900 dark:text-white">KYC Required</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium max-w-xs">
+            Complete your Aadhaar KYC verification before posting jobs.
+          </p>
+          <button onClick={() => navigate('/kyc')}
+            className="mt-2 bg-primary-600 text-white font-extrabold text-sm px-8 py-3 rounded-2xl shadow-lg shadow-primary-500/30">
+            Complete KYC Now
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pb-24 font-sans bg-slate-50 dark:bg-dark-900 min-h-screen">
@@ -120,6 +152,11 @@ export default function PostJob() {
             {step === 1 && (
               <>
                 <Input label="Job Title *" placeholder={category ? categoryHint : 'e.g. Wedding Catering Staff'} value={title} onChange={e => setTitle(e.target.value)} />
+                <Input label="Nature of work *" placeholder="e.g. Serving food to guests" value={natureOfWork} onChange={e => setNatureOfWork(e.target.value)} />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Client Name" placeholder="e.g. Rajesh Kumar" value={clientName} onChange={e => setClientName(e.target.value)} />
+                  <Input label="Client ID" placeholder="e.g. CLI-9021" value={clientId} onChange={e => setClientId(e.target.value)} />
+                </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Category *</label>
                   <div className="grid grid-cols-2 gap-2">
@@ -180,12 +217,22 @@ export default function PostJob() {
                 </div>
                 <Input label="City/Area *" placeholder="e.g. Bandra West, Mumbai" value={location} onChange={e => setLocation(e.target.value)} leftIcon={<MapPin size={16} />} />
                 <Textarea label="Complete Address" placeholder="Full venue address" rows={3} value={address} onChange={e => setAddress(e.target.value)} />
+                <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-dark-600 mt-2">
+                  <Toggle checked={needLocationBasedWorkers} onChange={setNeedLocationBasedWorkers} label="Need Location based workers?" />
+                </div>
               </>
             )}
 
             {step === 3 && (
               <>
                 <Textarea label="Job Description *" placeholder="Detail what the workers need to do..." rows={5} value={description} onChange={e => setDescription(e.target.value)} />
+                <Textarea label="Do's & Don'ts" placeholder="e.g. Do arrive 15 mins early. Don't use phones during service." rows={3} value={dosAndDonts} onChange={e => setDosAndDonts(e.target.value)} />
+                <Select label="Mode of Payment" value={modeOfPayment} onChange={e => setModeOfPayment(e.target.value)} options={[
+                  { value: 'Online', label: 'Online' },
+                  { value: 'Cash', label: 'Cash' },
+                  { value: 'Wallet', label: 'Wallet' },
+                ]} />
+                <Input label="Payment Date" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
                 <Select label="Dress Code" value={dressCode} onChange={e => setDressCode(e.target.value)} options={[
                   { value: 'Casual', label: 'Casual' },
                   { value: 'Formal (Black & White)', label: 'Formal (Black & White)' },

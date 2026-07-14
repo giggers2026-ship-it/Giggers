@@ -12,11 +12,11 @@ import { Shield, AlertCircle } from 'lucide-react';
 
 export default function Home() {
   const { user } = useAuthStore();
-  const { jobs, featuredJobs, myJobs, fetchJobs, fetchPostedJobs, fetchAppliedJobs, isLoading } = useJobStore();
+  const { jobs, featuredJobs, myJobs, jobCandidates, fetchJobs, fetchPostedJobs, fetchAppliedJobs, isLoading } = useJobStore();
   const { wallet, fetchWallet } = useWalletStore();
   const { addToast } = useUIStore();
   const navigate = useNavigate();
-
+  // Real category counts from Supabase
   const cateringCount = jobs.filter(j => j.category === 'Catering').length;
   const pamphletsCount = jobs.filter(j => j.category === 'Pamphlet Dist.').length;
 
@@ -33,24 +33,31 @@ export default function Home() {
 
   if (!user) return null;
 
-  // Employer metrics
+  // Real Employer Metrics
   const jobsPostedCount = myJobs.length;
+  // A simplistic way to get all applications for myJobs: since jobCandidates are fetched per job, we might not have all.
+  // We'll calculate based on workersHired for a simple approx, or if you had all apps it would be better.
   const inProgressCount = myJobs.filter(j => j.status === 'active').length;
   const completedCount = myJobs.filter(j => j.status === 'completed').length;
-  const totalApplications = myJobs.reduce((sum, j) => sum + (j.workersHired || 0), 0);
+  const totalApplications = myJobs.reduce((sum, j) => sum + (j.workersHired || 0), 0); // approx if we don't fetch all candidates
 
-  // Worker metrics
+  // Real Worker Metrics
   const walletBalance = wallet?.currentBalance ?? 0;
   const totalEarnings = wallet?.totalEarnings ?? 0;
-  const workerCompletedJobs = myJobs.filter(j => j.status === 'completed').length;
+  const workerCompletedJobs = myJobs.filter(j => j.status === 'completed').length; // myJobs holds applied jobs for workers
+
 
   return (
     <div className="pb-24 bg-slate-50 dark:bg-dark-900 min-h-screen">
-      <HomeHeader name={user.name} city={user.city} avatar={user.selfie} />
+      <HomeHeader
+        name={user.name}
+        city={user.city}
+        avatar={user.selfie}
+      />
 
       {user.role === 'employer' ? (
         <div className="px-5 mt-4 relative z-10 flex flex-col gap-6 pb-20">
-
+          
           {/* Overview Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -64,7 +71,7 @@ export default function Home() {
                 This Week <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
               </button>
             </div>
-
+            
             <div className="grid grid-cols-4 gap-2 text-center">
               <div>
                 <p className="text-2xl font-black mb-1" style={{ color: '#60A5FA' }}>{jobsPostedCount}</p>
@@ -94,11 +101,7 @@ export default function Home() {
 
             <div className="flex flex-col gap-3">
               {myJobs.slice(0, 3).map((job, idx) => (
-                <motion.div
-                  key={job.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
+                <motion.div key={job.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
                   className="bg-white dark:bg-dark-800 border border-slate-100 dark:border-dark-600 rounded-2xl p-4 flex items-center gap-4 shadow-sm cursor-pointer"
                   onClick={() => navigate(`/assign-work/${job.id}`)}
                 >
@@ -129,7 +132,7 @@ export default function Home() {
 
           {/* Floating CTA */}
           <div className="lg:hidden fixed bottom-24 left-0 right-0 px-5 z-40 max-w-lg mx-auto">
-            <button
+            <button 
               onClick={() => navigate('/post-job')}
               className="w-full py-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(37,99,235,0.35)] active:scale-[0.98] transition-all"
               style={{ backgroundColor: '#2563EB' }}
@@ -140,7 +143,7 @@ export default function Home() {
         </div>
       ) : (
         <div className="px-5 mt-4 relative z-10 flex flex-col gap-6 pb-20">
-
+          
           {/* Wallet Balance Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -153,14 +156,14 @@ export default function Home() {
                 <h3 className="text-white/90 font-extrabold text-sm mb-1">Wallet Balance</h3>
                 <p className="text-3xl font-black text-white">₹{walletBalance.toLocaleString('en-IN')}</p>
               </div>
-              <button
+              <button 
                 onClick={() => navigate('/wallet')}
                 className="bg-white text-green-700 text-xs font-black py-2 px-4 rounded-full shadow-sm hover:scale-105 transition-transform"
               >
                 Withdraw
               </button>
             </div>
-
+            
             <div className="flex items-center justify-between border-t border-white/20 pt-4 mt-2">
               <div>
                 <p className="text-[10px] text-white/70 font-semibold mb-0.5">Total Earnings</p>
@@ -181,51 +184,38 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col gap-3">
-              {isLoading ? (
-                [1, 2, 3].map(i => (
-                  <div key={i} className="h-20 rounded-2xl bg-slate-100 dark:bg-dark-800 animate-pulse" />
-                ))
-              ) : featuredJobs.length > 0 ? (
-                featuredJobs.slice(0, 3).map((job, idx) => (
-                  <motion.div
-                    key={job.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="bg-white dark:bg-dark-800 border border-slate-100 dark:border-dark-600 rounded-2xl p-4 flex items-center gap-4 shadow-sm cursor-pointer"
-                    onClick={() => navigate(`/jobs/${job.id}`)}
-                  >
-                    <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-dark-700 flex items-center justify-center text-xl flex-shrink-0">
-                      {job.categoryEmoji}
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white mb-0.5">{job.title}</h4>
-                      <p className="text-[10px] font-semibold text-slate-500 mb-0.5">{job.date} • {job.reportingTime}</p>
-                      <p className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
-                        📍 {job.location}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-black text-green-600">
-                        ₹{job.payPerWorker}
-                      </span>
-                      <p className="text-[9px] text-slate-400 font-bold">/day</p>
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="bg-white dark:bg-dark-800 border border-slate-100 dark:border-dark-600 rounded-2xl p-8 text-center">
-                  <span className="text-4xl block mb-3">🔍</span>
-                  <p className="text-sm font-bold text-slate-900 dark:text-white">No jobs available right now</p>
-                  <p className="text-xs text-slate-500 mt-1">Check back soon for new gigs.</p>
-                </div>
-              )}
+              {[
+                { title: 'Catering Helper', date: 'Today • 8:00 AM - 4:00 PM', location: 'Chennai', pay: '₹800', icon: '👨‍🍳' },
+                { title: 'Event Staff', date: 'Tomorrow • 6:00 PM - 12:00 AM', location: 'Chennai', pay: '₹700', icon: '🍷' },
+                { title: 'Welcome Desk Staff', date: '20 May • 9:00 AM - 5:00 PM', location: 'Chennai', pay: '₹750', icon: '📋' }
+              ].map((job, idx) => (
+                <motion.div key={idx} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
+                  className="bg-white dark:bg-dark-800 border border-slate-100 dark:border-dark-600 rounded-2xl p-4 flex items-center gap-4 shadow-sm cursor-pointer"
+                  onClick={() => navigate('/jobs')}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-slate-50 dark:bg-dark-700 flex items-center justify-center text-xl flex-shrink-0">
+                    {job.icon}
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-extrabold text-slate-900 dark:text-white mb-0.5">{job.title}</h4>
+                    <p className="text-[10px] font-semibold text-slate-500 mb-0.5">{job.date}</p>
+                    <p className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+                      📍 {job.location}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-black text-green-600">
+                      {job.pay}
+                    </span>
+                  </div>
+                </motion.div>
+              ))}
             </div>
           </div>
 
           {/* Floating CTA */}
           <div className="lg:hidden fixed bottom-24 left-0 right-0 px-5 z-40 max-w-lg mx-auto">
-            <button
+            <button 
               onClick={() => navigate('/jobs')}
               className="w-full py-4 rounded-2xl font-black text-sm text-white flex items-center justify-center gap-2 shadow-[0_8px_24px_rgba(22,163,74,0.35)] active:scale-[0.98] transition-all"
               style={{ backgroundColor: '#16a34a' }}
