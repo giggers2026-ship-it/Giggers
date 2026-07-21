@@ -17,6 +17,10 @@ const PUBLIC_PATHS = ['/', '/welcome', '/login', '/register', '/otp', '/forgot-p
 const ONBOARDING_PATHS = ['/kyc', '/pending'];
 // Paths that hide the bottom navigation
 const HIDE_NAV_PATHS = ['/welcome', '/login', '/register', '/otp', '/post-job', '/forgot-password', '/kyc', '/pending'];
+// Client invite links self-authenticate via token — never gated behind the normal auth check
+const isClientInvitePath = (pathname: string) => pathname.startsWith('/client/invite/');
+// Read-only client role — no bottom nav (that's Worker/Employer-oriented) or desktop sidebar
+const isClientPath = (pathname: string) => pathname.startsWith('/client/');
 
 export const AppShell: React.FC = () => {
   const { isAuthenticated, user, refreshUser } = useAuthStore();
@@ -26,7 +30,7 @@ export const AppShell: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const isPublicPath = PUBLIC_PATHS.includes(location.pathname);
+  const isPublicPath = PUBLIC_PATHS.includes(location.pathname) || isClientInvitePath(location.pathname);
   const isOnboardingPath = ONBOARDING_PATHS.includes(location.pathname);
 
   // 1. Not logged in + trying to access protected route → go to welcome
@@ -107,7 +111,8 @@ export const AppShell: React.FC = () => {
     !HIDE_NAV_PATHS.includes(location.pathname) &&
     !isDetailsPage &&
     location.pathname !== '/' &&
-    !isPendingApproval;
+    !isPendingApproval &&
+    !isClientPath(location.pathname);
 
   const themeClass = user?.role === 'employer' ? 'theme-employer' : '';
 
@@ -116,6 +121,7 @@ export const AppShell: React.FC = () => {
     !isPublicPath &&
     !isOnboardingPath &&
     !isPendingApproval &&
+    !isClientPath(location.pathname) &&
     location.pathname !== '/';
 
   if (isPendingApproval) {

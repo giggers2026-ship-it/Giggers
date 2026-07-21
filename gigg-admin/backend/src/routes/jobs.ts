@@ -37,12 +37,12 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
 
 /**
  * GET /api/jobs/:id
- * Full job detail with applicants
+ * Full job detail with applicants and pipeline progress (read-only)
  */
 router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { id } = req.params;
 
-  const [jobResult, applicantsResult] = await Promise.all([
+  const [jobResult, applicantsResult, tasksResult] = await Promise.all([
     supabaseAdmin
       .from('jobs')
       .select('*, profiles!jobs_employer_id_fkey(name, email, avatar)')
@@ -53,6 +53,11 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       .select('*, profiles!applications_worker_id_fkey(name, avatar, rating)')
       .eq('job_id', id)
       .order('applied_at', { ascending: false }),
+    supabaseAdmin
+      .from('job_tasks')
+      .select('*')
+      .eq('job_id', id)
+      .order('sort_order', { ascending: true }),
   ]);
 
   if (jobResult.error) {
@@ -60,7 +65,31 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
     return;
   }
 
-  res.json({ job: jobResult.data, applicants: applicantsResult.data || [] });
+  const applicants = applicantsResult.data || [];
+  const tasks = tasksResult.data || [];
+
+  let completionsByApplication: Record<string, any[]> = {};
+  if (applicants.length > 0 && tasks.length > 0) {
+    const applicationIds = applicants.map((a: any) => a.id);
+    const { data: completions } = await supabaseAdmin
+      .from('application_task_completions')
+      .select('*')
+      .in('application_id', applicationIds);
+
+    completionsByApplication = (completions || []).reduce((acc: Record<string, any[]>, c: any) => {
+      (acc[c.application_id] ||= []).push(c);
+      return acc;
+    }, {});
+  }
+
+  res.json({
+    job: jobResult.data,
+    applicants,
+    pipeline: {
+      tasks,
+      completionsByApplication,
+    },
+  });
 });
 
 /**

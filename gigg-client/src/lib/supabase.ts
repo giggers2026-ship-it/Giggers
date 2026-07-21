@@ -24,7 +24,7 @@ export type Database = {
           name: string;
           email: string | null;
           phone: string;
-          role: 'worker' | 'employer' | 'admin';
+          role: 'worker' | 'employer' | 'admin' | 'client';
           avatar: string | null;
           is_verified: boolean;
           is_approved: boolean;
@@ -87,7 +87,7 @@ export type Database = {
           id: string;
           job_id: string;
           worker_id: string;
-          status: 'applied' | 'shortlisted' | 'accepted' | 'rejected' | 'completed';
+          status: 'applied' | 'shortlisted' | 'hired' | 'rejected' | 'completed' | 'no_show';
           applied_at: string;
           updated_at: string;
         };

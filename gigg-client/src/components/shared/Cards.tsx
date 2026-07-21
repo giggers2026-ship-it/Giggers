@@ -220,9 +220,10 @@ interface ApplicationCardProps {
 const APP_STATUS_CONFIG = {
   applied:     { label: 'Applied',     variant: 'primary'  as const, emoji: '📬' },
   shortlisted: { label: 'Shortlisted', variant: 'warning'  as const, emoji: '⭐' },
-  accepted:    { label: 'Accepted',    variant: 'success'  as const, emoji: '✅' },
+  hired:       { label: 'Hired',       variant: 'success'  as const, emoji: '✅' },
   rejected:    { label: 'Rejected',    variant: 'danger'   as const, emoji: '❌' },
   completed:   { label: 'Completed',   variant: 'gray'     as const, emoji: '🏁' },
+  no_show:     { label: 'No Show',     variant: 'danger'   as const, emoji: '🚫' },
 };
 
 export const ApplicationCard: React.FC<ApplicationCardProps> = ({ application, onClick }) => {

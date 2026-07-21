@@ -21,7 +21,7 @@ interface JobState {
   saveJob: (jobId: string) => void;
   unsaveJob: (jobId: string) => void;
   setFilters: (f: Partial<FilterState>) => void;
-  postJob: (data: Partial<Job>, employerId: string) => Promise<void>;
+  postJob: (data: Partial<Job>, employerId: string) => Promise<string>;
   completeJob: (jobId: string) => void;
   fetchJobCandidates: (jobId: string) => Promise<void>;
   hireWorker: (jobId: string, applicationId: string) => Promise<void>;
@@ -278,12 +278,13 @@ export const useJobStore = create<JobState>((set, get) => ({
       .select()
       .single();
 
-    if (!error && newRow) {
-      const newJob = mapJob(newRow as unknown as Record<string, unknown>);
-      set(s => ({ myJobs: [newJob, ...s.myJobs], isLoading: false }));
-    } else {
-      set({ isLoading: false });
+    set({ isLoading: false });
+    if (error || !newRow) {
+      throw new Error(error?.message || 'Failed to post job');
     }
+    const newJob = mapJob(newRow as unknown as Record<string, unknown>);
+    set(s => ({ myJobs: [newJob, ...s.myJobs] }));
+    return newJob.id;
   },
 
   fetchChatThreadId: async (jobId: string, workerId: string) => {

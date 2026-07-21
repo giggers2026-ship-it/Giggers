@@ -296,7 +296,7 @@ export default function JobDetails() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      {c.status === 'accepted' ? (
+                      {c.status === 'hired' ? (
                         <>
                           <Badge variant="success">Hired</Badge>
                           <button
@@ -373,8 +373,8 @@ export default function JobDetails() {
               </div>
             </div>
 
-            <Button fullWidth size="lg" onClick={() => { handleHire(selectedCandidate.id); setSelectedCandidate(null); }} disabled={selectedCandidate.status === 'accepted' || job.workersHired >= job.workersNeeded}>
-              {selectedCandidate.status === 'accepted' ? 'Already Hired' : 'Hire this Worker'}
+            <Button fullWidth size="lg" onClick={() => { handleHire(selectedCandidate.id); setSelectedCandidate(null); }} disabled={selectedCandidate.status === 'hired' || job.workersHired >= job.workersNeeded}>
+              {selectedCandidate.status === 'hired' ? 'Already Hired' : 'Hire this Worker'}
             </Button>
           </div>
         </Modal>

@@ -12,6 +12,7 @@ interface AuthState {
   sendOtp: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string, role?: 'worker' | 'employer') => Promise<boolean>;
   register: (data: Partial<UserProfile> & { role: 'worker' | 'employer'; otp: string }) => Promise<void>;
+  redeemClientInvite: (inviteToken: string) => Promise<string>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: UserProfile) => void;
@@ -24,7 +25,7 @@ function mapApiUser(u: Record<string, unknown>): UserProfile {
     name: (u.name as string) || '',
     email: (u.email as string) || '',
     phone: (u.phone as string) || '',
-    role: ((u.role as 'worker' | 'employer' | 'admin') || 'worker') === 'admin' ? 'worker' : (u.role as 'worker' | 'employer') || 'worker',
+    role: ((u.role as 'worker' | 'employer' | 'admin' | 'client') || 'worker') === 'admin' ? 'worker' : (u.role as 'worker' | 'employer' | 'client') || 'worker',
     avatar: u.avatar as string | undefined,
     selfie: (u.selfie as string | undefined) ?? (u.selfie_url as string | undefined),
     isVerified: Boolean(u.isVerified ?? u.is_verified),
@@ -102,6 +103,17 @@ export const useAuthStore = create<AuthState>()(
             companyName: data.role === 'employer' ? data.companyName : undefined,
           });
           set({ token: res.token, user: mapApiUser(res.user), isAuthenticated: true, isLoading: false });
+        } catch (err: any) {
+          set({ isLoading: false });
+          throw err;
+        }
+      },
+      redeemClientInvite: async (inviteToken: string) => {
+        set({ isLoading: true });
+        try {
+          const res = await api.post<{ token: string; user: Record<string, unknown>; jobId: string }>('/api/clients/redeem', { inviteToken });
+          set({ token: res.token, user: mapApiUser(res.user), isAuthenticated: true, isLoading: false });
+          return res.jobId;
         } catch (err: any) {
           set({ isLoading: false });
           throw err;

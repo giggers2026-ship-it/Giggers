@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import UserDetail from './pages/UserDetail';
 import Jobs from './pages/Jobs';
+import JobDetail from './pages/JobDetail';
 import Payments from './pages/Payments';
 import KYC from './pages/KYC';
 import Settings from './pages/Settings';
@@ -70,6 +71,16 @@ const App: React.FC = () => {
             <ProtectedRoute>
               <AdminLayout>
                 <Jobs />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/jobs/:id"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <JobDetail />
               </AdminLayout>
             </ProtectedRoute>
           }

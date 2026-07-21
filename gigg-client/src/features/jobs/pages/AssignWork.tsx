@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AppHeader } from '../../../components/layout/Navigation';
-import { Button } from '../../../components/ui';
+import { Button, Input, Modal } from '../../../components/ui';
 import { useJobStore } from '../../../store/jobStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useClientStore } from '../../../store/clientStore';
 import { useUIStore } from '../../../store/uiStore';
-import { CheckCircle2, UserCircle2, ChevronRight } from 'lucide-react';
+import { CheckCircle2, UserCircle2, ChevronRight, Share2 } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export default function AssignWork() {
@@ -14,11 +15,17 @@ export default function AssignWork() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { myJobs, jobCandidates, fetchJobCandidates, hireWorker, isLoading } = useJobStore();
+  const { inviteClient } = useClientStore();
   const { addToast } = useUIStore();
 
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed'>('pending');
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([]);
   const [isHiring, setIsHiring] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
 
   const job = myJobs.find(j => j.id === id);
 
@@ -62,9 +69,56 @@ export default function AssignWork() {
     setActiveTab('confirmed');
   };
 
+  const handleInviteClient = async () => {
+    if (!clientName.trim() || !/^[6-9]\d{9}$/.test(clientPhone.replace(/\s/g, ''))) {
+      addToast('Please enter a valid name and 10-digit phone number', 'error');
+      return;
+    }
+    setIsInviting(true);
+    try {
+      const token = await inviteClient(job.id, clientName.trim(), clientPhone.replace(/\s/g, ''));
+      setInviteLink(`${window.location.origin}/client/invite/${token}`);
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to invite client', 'error');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(inviteLink).then(() => addToast('Link copied!', 'success'));
+  };
+
   return (
     <div className="pb-24 font-sans bg-slate-50 dark:bg-dark-900 min-h-screen">
-      <AppHeader title="Assign Work" showBack onBack={() => navigate(-1)} />
+      <AppHeader
+        title="Assign Work"
+        showBack
+        onBack={() => navigate(-1)}
+        rightAction={
+          <button onClick={() => setShowInviteModal(true)} className="p-2 text-slate-500 hover:text-primary-600 transition-colors">
+            <Share2 size={20} />
+          </button>
+        }
+      />
+
+      <Modal open={showInviteModal} onClose={() => { setShowInviteModal(false); setInviteLink(''); setClientName(''); setClientPhone(''); }} title="Share with Client">
+        <div className="flex flex-col gap-4 pb-4">
+          {!inviteLink ? (
+            <>
+              <Input label="Client Name" placeholder="e.g. Priya Sharma" value={clientName} onChange={(e) => setClientName(e.target.value)} />
+              <Input label="Client Phone" placeholder="10-digit mobile number" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} />
+              <Button fullWidth onClick={handleInviteClient} loading={isInviting}>Generate Invite Link</Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-500 font-medium">Share this link with your client — it opens directly to a live view of this job's pipeline, no login needed.</p>
+              <div className="bg-slate-50 dark:bg-dark-700 p-3 rounded-xl text-xs font-mono break-all">{inviteLink}</div>
+              <Button fullWidth onClick={handleCopyLink}>Copy Link</Button>
+            </>
+          )}
+        </div>
+      </Modal>
 
       {/* Tabs */}
       <div className="px-5 pt-4">

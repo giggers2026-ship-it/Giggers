@@ -6,7 +6,7 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
-  role: 'worker' | 'employer';
+  role: 'worker' | 'employer' | 'client';
   avatar?: string;
   selfie?: string;
   isVerified: boolean;
@@ -95,7 +95,7 @@ export interface Job {
 }
 
 export type JobStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-export type ApplicationStatus = 'applied' | 'shortlisted' | 'accepted' | 'rejected' | 'completed';
+export type ApplicationStatus = 'applied' | 'shortlisted' | 'hired' | 'rejected' | 'completed' | 'no_show';
 
 export interface Application {
   id: string;
@@ -109,6 +109,12 @@ export interface Application {
   status: ApplicationStatus;
   appliedAt: string;
   updatedAt: string;
+  // Legacy fixed-step pipeline fields — superseded by job_tasks/application_task_completions,
+  // kept during the coexistence period (see PIPELINE_MIGRATION.sql) until old jobs are migrated.
+  reportingCompleted?: boolean;
+  selfieCompleted?: boolean;
+  tshirtCompleted?: boolean;
+  shoesCompleted?: boolean;
 }
 
 export interface Work {
@@ -152,10 +158,59 @@ export interface ChatMessage {
   imageUrl?: string;
   fileUrl?: string;
   fileName?: string;
-  type: 'text' | 'image' | 'file' | 'voice';
+  type: 'text' | 'image' | 'file' | 'voice' | 'video';
   sentAt: string;
   isRead: boolean;
   duration?: number;
+  videoUrl?: string;
+  jobTaskId?: string;
+}
+
+export type TaskKind = 'opening' | 'task' | 'closing';
+export type TaskCompletionType = 'image' | 'form' | 'tick';
+export type TaskCompletionStatus = 'not_started' | 'in_progress' | 'submitted' | 'complete' | 'failed';
+
+export interface FormField {
+  label: string;
+  type: 'text' | 'number' | 'select';
+  options?: string[];
+}
+
+export interface JobTask {
+  id: string;
+  jobId: string;
+  kind: TaskKind;
+  sortOrder: number;
+  title: string;
+  description: string;
+  completionType: TaskCompletionType;
+  formSchema?: FormField[];
+  responseWindowMinutes: number;
+  autoFailMinutes: number;
+  requiresReview: boolean;
+}
+
+export interface TaskCompletion {
+  id: string;
+  applicationId: string;
+  jobTaskId: string;
+  status: TaskCompletionStatus;
+  imageUrl?: string;
+  formData?: Record<string, string | number>;
+  submittedAt?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+}
+
+export interface JobClient {
+  id: string;
+  jobId: string;
+  employerId: string;
+  name: string;
+  phone: string;
+  inviteToken?: string;
+  invitedAt: string;
+  lastViewedAt?: string;
 }
 
 export interface Transaction {

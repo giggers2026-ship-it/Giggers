@@ -67,7 +67,7 @@ export default function Jobs() {
 
   const ongoingJobs = [
     ...myJobs.filter(j => j.status === 'active'),
-    ...applications.filter(a => a.status === 'accepted').map(a => a.job)
+    ...applications.filter(a => a.status === 'hired').map(a => a.job)
   ];
 
   const visibleTabs = user?.role === 'employer'

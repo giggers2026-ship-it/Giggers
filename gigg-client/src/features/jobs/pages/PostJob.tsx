@@ -91,16 +91,22 @@ export default function PostJob() {
 
   const executePostJob = async () => {
     if (!user) return;
-    await postJob({
-      title, category, workersNeeded, payPerWorker: Number(payPerWorker),
-      date, reportingTime, endTime, location, address, description,
-      foodProvided: food, dressCode, genderPreference: gender as any,
-      needLocationBasedWorkers, natureOfWork, clientName, clientId,
-      modeOfPayment: modeOfPayment as any, paymentDate, dosAndDonts
-    }, user.id);
-    await fetchWallet();
-    addToast('Job posted & funds held in escrow! 🎉', 'success');
-    navigate('/jobs?tab=postings');
+    let newJobId: string;
+    try {
+      newJobId = await postJob({
+        title, category, workersNeeded, payPerWorker: Number(payPerWorker),
+        date, reportingTime, endTime, location, address, description,
+        foodProvided: food, dressCode, genderPreference: gender as any,
+        needLocationBasedWorkers, natureOfWork, clientName, clientId,
+        modeOfPayment: modeOfPayment as any, paymentDate, dosAndDonts
+      }, user.id);
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to post job. Please try again.', 'error');
+      return;
+    }
+    fetchWallet().catch(() => {});
+    addToast('Job posted! Now set up the work pipeline.', 'success');
+    navigate(`/pipeline-builder/${newJobId}`);
   };
 
   const handleAddFunds = () => {

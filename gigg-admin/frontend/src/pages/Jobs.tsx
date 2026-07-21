@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, ChevronDown, Star, XCircle, Zap } from 'lucide-react';
 import { Header } from '../components/Header';
 import { DataTable, Column } from '../components/DataTable';
@@ -16,6 +17,7 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 const Jobs: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<Job[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -194,6 +196,7 @@ const Jobs: React.FC = () => {
           onPageChange={setPage}
           rowKey={(row) => row.id}
           emptyMessage="No jobs found"
+          onRowClick={(row) => navigate(`/jobs/${row.id}`)}
         />
       </div>
     </div>

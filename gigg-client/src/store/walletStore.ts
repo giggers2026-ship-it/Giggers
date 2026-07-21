@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { WalletData } from '../types';
-import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
 import { useAuthStore } from './authStore';
 
@@ -30,45 +29,33 @@ export const useWalletStore = create<WalletState>()(
         if (!user) return;
         set({ isLoading: true });
 
-        // Use maybeSingle() — returns null instead of 406 when the row doesn't exist yet
-        const { data: walletData } = await supabase
-          .from('wallets')
-          .select('balance, escrow_balance')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        try {
+          const [walletData, history] = await Promise.all([
+            api.get<{ balance: number; escrowBalance: number }>('/api/payments/wallet'),
+            api.get<{ data: any[] }>('/api/payments/history'),
+          ]);
 
-        // Auto-create a zero-balance wallet for brand-new users
-        if (!walletData) {
-          await supabase
-            .from('wallets')
-            .upsert({ user_id: user.id, balance: 0, escrow_balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true });
+          set({
+            wallet: {
+              currentBalance: walletData.balance,
+              pendingBalance: walletData.escrowBalance,
+              totalEarnings: 0,
+              totalWithdrawn: 0,
+              transactions: (history.data || []).map((t: any) => ({
+                id: t.id,
+                type: t.type,
+                amount: t.amount,
+                description: t.description,
+                date: t.created_at,
+                status: t.status,
+                category: t.category || 'earning',
+              })),
+            },
+            isLoading: false,
+          });
+        } catch {
+          set({ isLoading: false });
         }
-
-        const { data: txns } = await supabase
-          .from('transactions')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        set({
-          wallet: {
-            currentBalance: walletData?.balance ?? 0,
-            pendingBalance: walletData?.escrow_balance ?? 0,
-            totalEarnings: 0,
-            totalWithdrawn: 0,
-            transactions: (txns || []).map((t: any) => ({
-              id: t.id,
-              type: t.type,
-              amount: t.amount,
-              description: t.description,
-              date: t.created_at,
-              status: t.status,
-              category: t.category || 'earning',
-            })),
-          },
-          isLoading: false,
-        });
       },
 
       createTopUpOrder: async (amountRupees: number) => {

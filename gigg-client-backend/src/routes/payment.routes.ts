@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth } from '../middleware/auth';
-import { createOrder, verifyPayment, razorpayWebhook, paymentHistory } from '../controllers/payment.controller';
+import { createOrder, verifyPayment, razorpayWebhook, paymentHistory, getWallet } from '../controllers/payment.controller';
 
 const router = Router();
 
@@ -14,5 +14,6 @@ router.use(requireAuth);
 router.post('/order', createOrder);
 router.post('/verify', verifyPayment);
 router.get('/history', paymentHistory);
+router.get('/wallet', getWallet);
 
 export default router;
