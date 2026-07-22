@@ -35,7 +35,7 @@ export default function ClientPipelineView() {
   }, [jobId, fetchJobCandidates]);
 
   useEffect(() => {
-    const hired = jobCandidates.filter((c) => c.status === 'hired' || c.status === 'completed');
+    const hired = jobCandidates.filter((c) => c.status === 'confirmed' || c.status === 'completed');
     if (hired.length === 0) {
       setIsLoading(false);
       return;

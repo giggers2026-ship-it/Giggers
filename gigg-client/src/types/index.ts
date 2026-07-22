@@ -41,6 +41,10 @@ export interface UserProfile {
   companyName?: string;
   companyLogo?: string;
   isVerifiedEmployer?: boolean;
+  creditPoint: number;
+  oneLiner?: string;
+  upiId?: string;
+  bankAccount?: string;
 }
 
 export interface JobCategory {
@@ -95,7 +99,7 @@ export interface Job {
 }
 
 export type JobStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-export type ApplicationStatus = 'applied' | 'shortlisted' | 'hired' | 'rejected' | 'completed' | 'no_show';
+export type ApplicationStatus = 'applied' | 'shortlisted' | 'hired' | 'confirmed' | 'rejected' | 'completed' | 'no_show';
 
 export interface Application {
   id: string;
@@ -197,6 +201,7 @@ export interface TaskCompletion {
   status: TaskCompletionStatus;
   imageUrl?: string;
   formData?: Record<string, string | number>;
+  availableAt?: string;
   submittedAt?: string;
   reviewedAt?: string;
   rejectionReason?: string;

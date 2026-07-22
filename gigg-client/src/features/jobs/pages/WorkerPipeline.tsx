@@ -25,7 +25,7 @@ export default function WorkerPipeline() {
   const navigate = useNavigate();
   const { jobs, fetchJobs, applications, fetchAppliedJobs } = useJobStore();
   const { user } = useAuthStore();
-  const { tasks, completions, isLoading, fetchCompletions, submitTick, submitForm, submitImage } = usePipelineStore();
+  const { tasks, completions, isLoading, fetchCompletions, refetchCompletionsSilently, submitTick, submitForm, submitImage } = usePipelineStore();
   const { addToast } = useUIStore();
 
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
@@ -46,6 +46,23 @@ export default function WorkerPipeline() {
       fetchCompletions(application.id).catch(() => addToast('Failed to load pipeline', 'error'));
     }
   }, [application?.id]);
+
+  // Poll so an idle worker still observes server-side auto-fail flips without interacting.
+  useEffect(() => {
+    if (!application) return;
+    const interval = setInterval(() => {
+      refetchCompletionsSilently(application.id).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [application?.id]);
+
+  // Drives the response-window (blur) recompute on the same cadence as the poll above,
+  // without needing a per-second timer for every task row.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!job || !application || isLoading) {
     return <div className="p-5 text-center mt-20 font-bold dark:text-white">Loading job...</div>;
@@ -136,10 +153,14 @@ export default function WorkerPipeline() {
               const isLocked = status === 'not_started';
               const isWorking = loadingTaskId === task.id;
 
+              const availableAtMs = completion?.availableAt ? new Date(completion.availableAt).getTime() : null;
+              const responseDeadline = availableAtMs !== null ? availableAtMs + task.responseWindowMinutes * 60_000 : null;
+              const isPastResponseWindow = status === 'in_progress' && responseDeadline !== null && now > responseDeadline;
+
               return (
                 <div key={task.id} className={clsx(
                   'relative flex items-start justify-between group mb-6 last:mb-0 transition-opacity',
-                  isLocked ? 'opacity-50 grayscale pointer-events-none' : 'opacity-100'
+                  isLocked ? 'opacity-50 grayscale pointer-events-none' : isPastResponseWindow ? 'opacity-60' : 'opacity-100'
                 )}>
                   <div className={clsx(
                     'flex items-center justify-center w-10 h-10 rounded-full border-4 shrink-0 z-10 transition-colors',
@@ -164,19 +185,19 @@ export default function WorkerPipeline() {
                     </div>
                     {task.description && <p className="text-xs text-slate-400 mb-2">{task.description}</p>}
 
-                    {status === 'in_progress' && completion && task.completionType === 'tick' && (
+                    {status === 'in_progress' && completion && task.completionType === 'tick' && !isPastResponseWindow && (
                       <Button size="sm" className="w-full mt-2 py-1.5" onClick={() => handleTick(completion)} loading={isWorking}>
                         Mark Complete
                       </Button>
                     )}
 
-                    {status === 'in_progress' && completion && task.completionType === 'image' && (
+                    {status === 'in_progress' && completion && task.completionType === 'image' && !isPastResponseWindow && (
                       <Button size="sm" variant="primary" className="w-full mt-2 py-1.5" onClick={() => handleOpenCamera(completion)} loading={isWorking}>
                         Open Camera
                       </Button>
                     )}
 
-                    {status === 'in_progress' && completion && task.completionType === 'form' && (
+                    {status === 'in_progress' && completion && task.completionType === 'form' && !isPastResponseWindow && (
                       <div className="mt-2 flex flex-col gap-2">
                         <Input
                           placeholder="Your response"
@@ -186,6 +207,12 @@ export default function WorkerPipeline() {
                         <Button size="sm" variant="outline" className="w-full py-1.5" onClick={() => handleFormSubmit(completion)} loading={isWorking}>
                           Submit
                         </Button>
+                      </div>
+                    )}
+
+                    {status === 'in_progress' && isPastResponseWindow && (
+                      <div className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded inline-block mt-2">
+                        Response window closed — waiting for auto-review
                       </div>
                     )}
 

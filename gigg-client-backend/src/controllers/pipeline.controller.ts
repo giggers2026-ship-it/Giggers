@@ -29,6 +29,7 @@ async function mapCompletion(row: Record<string, any>) {
     status: row.status,
     imageUrl,
     formData: row.form_data || undefined,
+    availableAt: row.available_at || undefined,
     submittedAt: row.submitted_at || undefined,
     reviewedAt: row.reviewed_at || undefined,
     rejectionReason: row.rejection_reason || undefined,

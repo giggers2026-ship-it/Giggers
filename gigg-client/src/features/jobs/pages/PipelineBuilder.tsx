@@ -116,6 +116,23 @@ export default function PipelineBuilder() {
             ))}
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Response window (min)"
+            type="number"
+            min="1"
+            value={task.responseWindowMinutes}
+            onChange={(e) => updateTask(index, { responseWindowMinutes: Number(e.target.value) || 5 })}
+          />
+          <Input
+            label="Auto-fail after (min)"
+            type="number"
+            min="1"
+            value={task.autoFailMinutes}
+            onChange={(e) => updateTask(index, { autoFailMinutes: Number(e.target.value) || 10 })}
+          />
+        </div>
       </div>
     );
   };

@@ -8,6 +8,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
 import UserDetail from './pages/UserDetail';
+import WorkerActivity from './pages/WorkerActivity';
 import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import Payments from './pages/Payments';
@@ -61,6 +62,16 @@ const App: React.FC = () => {
             <ProtectedRoute>
               <AdminLayout>
                 <UserDetail />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/workers"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <WorkerActivity />
               </AdminLayout>
             </ProtectedRoute>
           }

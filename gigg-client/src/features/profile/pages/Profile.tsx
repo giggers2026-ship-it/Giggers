@@ -11,6 +11,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { api } from '../../../lib/api';
 import { useUIStore } from '../../../store/uiStore';
 import { Avatar, Card, Badge, Button, Input, Toggle, Select, Modal } from '../../../components/ui';
+import { displayIdForRole } from '../../../lib/displayId';
 
 // ─── Edit Profile Modal ──────────────────────────────────────
 function EditProfileModal({ user, open, onClose, onSave }: any) {
@@ -18,6 +19,7 @@ function EditProfileModal({ user, open, onClose, onSave }: any) {
   const [city, setCity] = useState(user.city || '');
   const [area, setArea] = useState(user.area || '');
   const [bio, setBio] = useState(user.bio || '');
+  const [oneLiner, setOneLiner] = useState(user.oneLiner || '');
   const [phone, setPhone] = useState(user.phone || '');
   const [selfie, setSelfie] = useState(user.selfie || '');
 
@@ -55,6 +57,19 @@ function EditProfileModal({ user, open, onClose, onSave }: any) {
         ))}
 
         <div>
+          <label className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 block">One-liner</label>
+          <div className="flex items-center gap-3 bg-slate-50 dark:bg-dark-700 border border-slate-200 dark:border-dark-500 rounded-xl px-4 py-3">
+            <input
+              value={oneLiner}
+              onChange={e => e.target.value.length <= 80 && setOneLiner(e.target.value)}
+              placeholder="A short tagline about you"
+              maxLength={80}
+              className="flex-1 bg-transparent text-sm font-medium text-slate-900 dark:text-white outline-none placeholder:text-slate-400"
+            />
+          </div>
+        </div>
+
+        <div>
           <label className="text-xs font-bold text-slate-600 dark:text-slate-400 mb-1.5 block">Bio</label>
           <textarea
             value={bio}
@@ -66,7 +81,7 @@ function EditProfileModal({ user, open, onClose, onSave }: any) {
         </div>
 
         <button
-          onClick={() => onSave({ name, city, area, bio, phone, selfie })}
+          onClick={() => onSave({ name, city, area, bio, oneLiner, phone, selfie })}
           className="mt-6 w-full flex items-center justify-center gap-2 bg-primary-600 text-white font-extrabold py-4 rounded-2xl shadow-lg shadow-primary-500/30 active:scale-95 transition-transform"
         >
           <Save size={18} /> Save Changes
@@ -648,7 +663,7 @@ function VerificationModal({ user, open, onClose, onVerify, onReset }: any) {
 export default function Profile() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user, logout, setUser, refreshUser } = useAuthStore();
+  const { user, logout, setUser, refreshUser, updateProfile } = useAuthStore();
   const { addToast } = useUIStore();
 
   const [modal, setModal] = useState<null | 'edit' | 'skills' | 'settings' | 'help' | 'verify'>(null);
@@ -657,10 +672,14 @@ export default function Profile() {
 
   if (!user) return null;
 
-  const handleSaveProfile = (data: any) => {
-    setUser({ ...user, ...data });
-    setModal(null);
-    addToast('Profile updated successfully! ✓', 'success');
+  const handleSaveProfile = async (data: any) => {
+    try {
+      await updateProfile(data);
+      setModal(null);
+      addToast('Profile updated successfully! ✓', 'success');
+    } catch {
+      addToast('Failed to update profile', 'error');
+    }
   };
 
   const handleVerification = async () => {
@@ -777,6 +796,7 @@ export default function Profile() {
                   <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
                     {user.role === 'employer' ? (user.companyName || 'Business Owner') : (user.categories?.length ? user.categories[0] : 'Member')}
                   </p>
+                  <p className="text-[10px] font-mono font-bold text-slate-400 mb-1">{displayIdForRole(user.id, user.role)}</p>
                 </div>
                 <button
                   onClick={() => setModal('edit')}
@@ -799,7 +819,7 @@ export default function Profile() {
             </p>
           )}
 
-          <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-dark-600">
+          <div className={`grid ${user.role === 'employer' ? 'grid-cols-3' : 'grid-cols-4'} gap-3 mt-4 pt-4 border-t border-slate-100 dark:border-dark-600`}>
             {user.role === 'employer' ? (
               <>
                 <div className="text-center">
@@ -811,8 +831,8 @@ export default function Profile() {
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Rating</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-black text-emerald-600 dark:text-emerald-400">Verified</p>
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Employer</p>
+                  <p className="text-xl font-black text-slate-900 dark:text-white">{user.creditPoint}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Credit Points</p>
                 </div>
               </>
             ) : (
@@ -830,6 +850,10 @@ export default function Profile() {
                     ₹{user.totalEarnings >= 1000 ? `${(user.totalEarnings / 1000).toFixed(1)}k` : user.totalEarnings ?? 0}
                   </p>
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Earned</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-black text-slate-900 dark:text-white">{user.creditPoint}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Credit Points</p>
                 </div>
               </>
             )}

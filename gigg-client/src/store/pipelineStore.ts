@@ -26,6 +26,7 @@ function mapCompletion(c: any): TaskCompletion {
     status: c.status,
     imageUrl: c.imageUrl,
     formData: c.formData,
+    availableAt: c.availableAt,
     submittedAt: c.submittedAt,
     reviewedAt: c.reviewedAt,
     rejectionReason: c.rejectionReason,
@@ -49,6 +50,7 @@ interface PipelineState {
   fetchJobTasks: (jobId: string) => Promise<JobTask[]>;
   saveJobTasks: (jobId: string, tasks: TaskDraft[]) => Promise<void>;
   fetchCompletions: (applicationId: string) => Promise<void>;
+  refetchCompletionsSilently: (applicationId: string) => Promise<void>;
   submitTick: (completionId: string) => Promise<void>;
   submitForm: (completionId: string, formData: Record<string, string | number>) => Promise<void>;
   submitImage: (completionId: string, imageDataUrl: string) => Promise<void>;
@@ -83,27 +85,31 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
     }
   },
 
+  /** Re-fetch tasks/completions without toggling isLoading — used after a
+   * submit/review so newly-unlocked tasks appear without flashing the
+   * page's full loading state. */
+  refetchCompletionsSilently: async (applicationId: string) => {
+    const res = await api.get<{ tasks: any[]; completions: any[] }>(`/api/pipeline/applications/${applicationId}/completions`);
+    set({ tasks: res.tasks.map(mapTask), completions: res.completions.map(mapCompletion) });
+  },
+
   submitTick: async (completionId: string) => {
     const res = await api.post<{ completion: any }>(`/api/pipeline/completions/${completionId}/tick`);
-    const updated = mapCompletion(res.completion);
-    set((s) => ({ completions: s.completions.map((c) => (c.id === updated.id ? updated : c)) }));
+    await get().refetchCompletionsSilently(res.completion.applicationId);
   },
 
   submitForm: async (completionId: string, formData: Record<string, string | number>) => {
     const res = await api.post<{ completion: any }>(`/api/pipeline/completions/${completionId}/form`, { formData });
-    const updated = mapCompletion(res.completion);
-    set((s) => ({ completions: s.completions.map((c) => (c.id === updated.id ? updated : c)) }));
+    await get().refetchCompletionsSilently(res.completion.applicationId);
   },
 
   submitImage: async (completionId: string, imageDataUrl: string) => {
     const res = await api.post<{ completion: any }>(`/api/pipeline/completions/${completionId}/image`, { image: imageDataUrl });
-    const updated = mapCompletion(res.completion);
-    set((s) => ({ completions: s.completions.map((c) => (c.id === updated.id ? updated : c)) }));
+    await get().refetchCompletionsSilently(res.completion.applicationId);
   },
 
   reviewCompletion: async (completionId: string, approve: boolean, rejectionReason?: string) => {
     const res = await api.post<{ completion: any }>(`/api/pipeline/completions/${completionId}/review`, { approve, rejectionReason });
-    const updated = mapCompletion(res.completion);
-    set((s) => ({ completions: s.completions.map((c) => (c.id === updated.id ? updated : c)) }));
+    await get().refetchCompletionsSilently(res.completion.applicationId);
   },
 }));

@@ -59,6 +59,10 @@ function mapApiUser(u: Record<string, unknown>): UserProfile {
     categories: u.categories as string[] | undefined,
     gender: u.gender as 'male' | 'female' | 'other' | undefined,
     age: u.age as number | undefined,
+    creditPoint: Number(u.creditPoint ?? u.credit_point) || 0,
+    oneLiner: (u.oneLiner as string | undefined) ?? (u.one_liner as string | undefined),
+    upiId: (u.upiId as string | undefined) ?? (u.upi_id as string | undefined),
+    bankAccount: (u.bankAccount as string | undefined) ?? (u.bank_account as string | undefined),
   };
 }
 
@@ -149,6 +153,9 @@ export const useAuthStore = create<AuthState>()(
         if (updates.age !== undefined) dbUpdates.age = updates.age;
         if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
         if (updates.companyName !== undefined) dbUpdates.company_name = updates.companyName;
+        if (updates.oneLiner !== undefined) dbUpdates.one_liner = updates.oneLiner;
+        if (updates.upiId !== undefined) dbUpdates.upi_id = updates.upiId;
+        if (updates.bankAccount !== undefined) dbUpdates.bank_account = updates.bankAccount;
         const { data: updated, error } = await supabase.from('profiles').update(dbUpdates).eq('id', user.id).select().single();
         if (!error && updated) {
           set({ user: mapApiUser(updated as Record<string, unknown>) });

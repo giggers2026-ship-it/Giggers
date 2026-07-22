@@ -81,7 +81,7 @@ export interface Job {
 
 // ── Applications ──────────────────────────────────────────────
 
-export type ApplicationStatus = 'applied' | 'shortlisted' | 'hired' | 'rejected' | 'completed' | 'no_show';
+export type ApplicationStatus = 'applied' | 'shortlisted' | 'hired' | 'confirmed' | 'rejected' | 'completed' | 'no_show';
 
 export interface Application {
   id: string;

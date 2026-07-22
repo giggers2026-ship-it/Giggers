@@ -47,6 +47,10 @@ function serializeProfile(profile: Record<string, any>) {
     kycSubmittedAt: profile.kyc_submitted_at || undefined,
     kycReviewedAt: profile.kyc_reviewed_at || undefined,
     kycRejectionReason: profile.kyc_rejection_reason || undefined,
+    creditPoint: profile.credit_point ?? 100,
+    oneLiner: profile.one_liner || undefined,
+    upiId: profile.upi_id || undefined,
+    bankAccount: profile.bank_account || undefined,
   };
 }
 

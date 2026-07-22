@@ -22,12 +22,20 @@ interface JobState {
   unsaveJob: (jobId: string) => void;
   setFilters: (f: Partial<FilterState>) => void;
   postJob: (data: Partial<Job>, employerId: string) => Promise<string>;
+  updateJob: (jobId: string, updates: Partial<Job>, employerId: string) => Promise<{ creditPenaltyApplied: boolean }>;
   completeJob: (jobId: string) => void;
   fetchJobCandidates: (jobId: string) => Promise<void>;
   hireWorker: (jobId: string, applicationId: string) => Promise<void>;
+  rejectWorker: (applicationId: string) => Promise<void>;
+  confirmHire: (applicationId: string) => Promise<void>;
+  declineHire: (applicationId: string) => Promise<void>;
   fetchChatThreadId: (jobId: string, workerId: string) => Promise<string | null>;
   updatePipelineStep: (applicationId: string, stepId: string) => Promise<void>;
 }
+
+/** Flat credit-point deduction for editing a job within the last hour before it starts.
+ * Placeholder default — the wireframe spec names the mechanism but not a magnitude. */
+const LATE_EDIT_CREDIT_PENALTY = 5;
 
 const defaultFilters: FilterState = {
   category: '', location: '', date: 'any', sort: 'nearby',
@@ -77,6 +85,40 @@ function mapJob(row: Record<string, unknown>): Job {
   };
 }
 
+/** Map camelCase Job partial → snake_case DB row for insert/update. Only includes
+ * fields present in `data`, except for the always-required insert defaults handled
+ * separately by callers. */
+function toDbJobRow(data: Partial<Job>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  if (data.title !== undefined) row.title = data.title;
+  if (data.category !== undefined) row.category = data.category;
+  if (data.categoryEmoji !== undefined) row.category_emoji = data.categoryEmoji;
+  if (data.description !== undefined) row.description = data.description;
+  if (data.date !== undefined) row.date = data.date;
+  if (data.reportingTime !== undefined) row.reporting_time = data.reportingTime;
+  if (data.endTime !== undefined) row.end_time = data.endTime;
+  if (data.location !== undefined) row.location = data.location;
+  if (data.address !== undefined) row.address = data.address;
+  if (data.lat !== undefined) row.lat = data.lat;
+  if (data.lng !== undefined) row.lng = data.lng;
+  if (data.workersNeeded !== undefined) row.workers_needed = data.workersNeeded;
+  if (data.payPerWorker !== undefined) row.pay_per_worker = data.payPerWorker;
+  if (data.foodProvided !== undefined) row.food_provided = data.foodProvided;
+  if (data.transportProvided !== undefined) row.transport_provided = data.transportProvided;
+  if (data.dressCode !== undefined) row.dress_code = data.dressCode;
+  if (data.languagesRequired !== undefined) row.languages_required = data.languagesRequired;
+  if (data.genderPreference !== undefined) row.gender_preference = data.genderPreference;
+  if (data.isUrgent !== undefined) row.is_urgent = data.isUrgent;
+  if (data.needLocationBasedWorkers !== undefined) row.need_location_based_workers = data.needLocationBasedWorkers;
+  if (data.natureOfWork !== undefined) row.nature_of_work = data.natureOfWork;
+  if (data.clientName !== undefined) row.client_name = data.clientName;
+  if (data.clientId !== undefined) row.client_id = data.clientId;
+  if (data.modeOfPayment !== undefined) row.mode_of_payment = data.modeOfPayment;
+  if (data.paymentDate !== undefined) row.payment_date = data.paymentDate;
+  if (data.dosAndDonts !== undefined) row.dos_and_donts = data.dosAndDonts;
+  return row;
+}
+
 /** Map snake_case DB row → Application type */
 function mapApplication(row: Record<string, unknown>): Application {
   const profilesData = row.profiles as Record<string, unknown> | undefined;
@@ -103,6 +145,7 @@ function mapApplication(row: Record<string, unknown>): Application {
         reviewCount: Number(profilesData.review_count) || 0,
         totalEarnings: Number(profilesData.total_earnings) || 0,
         attendanceRate: Number(profilesData.attendance_rate) || 100,
+        creditPoint: Number(profilesData.credit_point) || 0,
         bio: profilesData.bio as string | undefined,
         skills: profilesData.skills as string[] | undefined,
         languages: profilesData.languages as string[] | undefined,
@@ -243,6 +286,7 @@ export const useJobStore = create<JobState>((set, get) => ({
     const { data: newRow, error } = await supabase
       .from('jobs')
       .insert({
+        ...toDbJobRow(data),
         title: data.title || '',
         category: data.category || '',
         category_emoji: data.categoryEmoji || '💼',
@@ -285,6 +329,43 @@ export const useJobStore = create<JobState>((set, get) => ({
     const newJob = mapJob(newRow as unknown as Record<string, unknown>);
     set(s => ({ myJobs: [newJob, ...s.myJobs] }));
     return newJob.id;
+  },
+
+  /** Employer edits an existing job. If the job starts within 60 minutes,
+   * a flat credit-point penalty is applied to discourage last-minute changes. */
+  updateJob: async (jobId: string, updates: Partial<Job>, employerId: string) => {
+    const { myJobs } = get();
+    const existing = myJobs.find(j => j.id === jobId);
+
+    let creditPenaltyApplied = false;
+    if (existing) {
+      const reportingDateTime = new Date(`${existing.date}T${existing.reportingTime || '00:00'}`);
+      const msUntilStart = reportingDateTime.getTime() - Date.now();
+      if (msUntilStart > 0 && msUntilStart <= 60 * 60 * 1000) {
+        creditPenaltyApplied = true;
+      }
+    }
+
+    const { data: updatedRow, error } = await supabase
+      .from('jobs')
+      .update(toDbJobRow(updates))
+      .eq('id', jobId)
+      .eq('employer_id', employerId)
+      .select()
+      .single();
+
+    if (error || !updatedRow) {
+      throw new Error(error?.message || 'Failed to update job');
+    }
+
+    if (creditPenaltyApplied) {
+      await supabase.rpc('decrement_credit_point', { p_user_id: employerId, p_amount: LATE_EDIT_CREDIT_PENALTY });
+    }
+
+    const updatedJob = mapJob(updatedRow as unknown as Record<string, unknown>);
+    set(s => ({ myJobs: s.myJobs.map(j => (j.id === jobId ? updatedJob : j)) }));
+
+    return { creditPenaltyApplied };
   },
 
   fetchChatThreadId: async (jobId: string, workerId: string) => {
@@ -364,13 +445,97 @@ export const useJobStore = create<JobState>((set, get) => ({
         { onConflict: 'job_id,worker_id', ignoreDuplicates: true }
       );
 
-      // Notify the worker they were hired
+      // Notify the worker they've been offered the job — they still need to confirm
       await supabase.from('notifications').insert({
         user_id: candidate.workerId,
         type: 'application_accepted',
         title: 'You got hired! 🎉',
-        message: `You have been selected for "${job.title}". Check your messages to connect with the employer.`,
+        message: `"${job.title}" wants to hire you! Please confirm to accept.`,
         action_id: jobId,
+        is_read: false,
+      });
+    }
+  },
+
+  /** Employer rejects a pending applicant */
+  rejectWorker: async (applicationId) => {
+    const { jobCandidates } = get();
+    const candidate = jobCandidates.find((c) => c.id === applicationId);
+
+    set((s) => ({
+      jobCandidates: s.jobCandidates.map((c) =>
+        c.id === applicationId ? { ...c, status: 'rejected' as const } : c
+      ),
+    }));
+
+    await supabase
+      .from('applications')
+      .update({ status: 'rejected', updated_at: new Date().toISOString() })
+      .eq('id', applicationId);
+
+    if (candidate) {
+      await supabase.from('notifications').insert({
+        user_id: candidate.workerId,
+        type: 'application_rejected',
+        title: 'Application not selected',
+        message: `Your application for "${candidate.job?.title || 'a job'}" was not selected this time.`,
+        action_id: candidate.jobId,
+        is_read: false,
+      });
+    }
+  },
+
+  /** Worker confirms a hire offer, becoming fully active on the job */
+  confirmHire: async (applicationId) => {
+    const { applications } = get();
+    const application = applications.find((a) => a.id === applicationId);
+
+    set((s) => ({
+      applications: s.applications.map((a) =>
+        a.id === applicationId ? { ...a, status: 'confirmed' as const } : a
+      ),
+    }));
+
+    await supabase
+      .from('applications')
+      .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+      .eq('id', applicationId);
+
+    if (application?.job?.employerId) {
+      await supabase.from('notifications').insert({
+        user_id: application.job.employerId,
+        type: 'hire_confirmed',
+        title: 'Worker confirmed! ✅',
+        message: `${application.workerName} confirmed for "${application.job.title}".`,
+        action_id: application.jobId,
+        is_read: false,
+      });
+    }
+  },
+
+  /** Worker declines a hire offer */
+  declineHire: async (applicationId) => {
+    const { applications } = get();
+    const application = applications.find((a) => a.id === applicationId);
+
+    set((s) => ({
+      applications: s.applications.map((a) =>
+        a.id === applicationId ? { ...a, status: 'rejected' as const } : a
+      ),
+    }));
+
+    await supabase
+      .from('applications')
+      .update({ status: 'rejected', updated_at: new Date().toISOString() })
+      .eq('id', applicationId);
+
+    if (application?.job?.employerId) {
+      await supabase.from('notifications').insert({
+        user_id: application.job.employerId,
+        type: 'hire_declined',
+        title: 'Offer declined',
+        message: `${application.workerName} declined the offer for "${application.job.title}".`,
+        action_id: application.jobId,
         is_read: false,
       });
     }

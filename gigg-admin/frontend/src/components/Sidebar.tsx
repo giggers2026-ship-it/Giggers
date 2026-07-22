@@ -10,12 +10,14 @@ import {
   Settings,
   LogOut,
   Zap,
+  ClipboardCheck,
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/users', icon: Users, label: 'Users' },
+  { to: '/workers', icon: ClipboardCheck, label: 'Worker Activity' },
   { to: '/jobs', icon: Briefcase, label: 'Jobs' },
   { to: '/payments', icon: CreditCard, label: 'Payments' },
   { to: '/kyc', icon: FileCheck, label: 'KYC Verify' },

@@ -31,7 +31,8 @@ export default function JobDetails() {
     ? applications.find((a) => a.jobId === job.id)
     : undefined;
   const hasApplied = jobApplication !== undefined;
-  const isHired = jobApplication?.status === 'hired';
+  const isConfirmed = jobApplication?.status === 'confirmed';
+  const isPendingConfirmation = jobApplication?.status === 'hired';
 
   const handleApply = async () => {
     if (!user) return;
@@ -71,7 +72,7 @@ export default function JobDetails() {
               </button>
             ) : null
           ) : (
-            <button onClick={() => {}} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary-500">
+            <button onClick={() => navigate(`/edit-job/${job.id}`)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary-500">
               <Edit size={22} />
             </button>
           )
@@ -218,7 +219,7 @@ export default function JobDetails() {
           <div className="text-center py-2 text-sm font-bold text-slate-500 dark:text-slate-400">
             Employers cannot apply for gigs.
           </div>
-        ) : isHired ? (
+        ) : isConfirmed ? (
           <div className="flex flex-col gap-3">
             <Button fullWidth size="lg" disabled className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-200">
               <CheckCircle size={18} className="mr-2" /> You're Hired!
@@ -233,6 +234,15 @@ export default function JobDetails() {
               }}
             >
               <MessageCircle size={18} className="mr-2" /> Chat with Employer
+            </Button>
+          </div>
+        ) : isPendingConfirmation ? (
+          <div className="flex flex-col gap-3">
+            <Button fullWidth size="lg" disabled className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 border-blue-200">
+              <CheckCircle size={18} className="mr-2" /> Offer Received — Confirm in Ongoing tab
+            </Button>
+            <Button fullWidth variant="outline" onClick={() => navigate('/jobs?tab=ongoing')}>
+              Go to Ongoing
             </Button>
           </div>
         ) : hasApplied ? (
@@ -296,9 +306,9 @@ export default function JobDetails() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      {c.status === 'hired' ? (
+                      {c.status === 'hired' || c.status === 'confirmed' ? (
                         <>
-                          <Badge variant="success">Hired</Badge>
+                          <Badge variant="success">{c.status === 'confirmed' ? 'Confirmed' : 'Hired (Pending)'}</Badge>
                           <button
                             onClick={async () => {
                               const threadId = await fetchChatThreadId(job.id, c.workerId);
@@ -373,8 +383,8 @@ export default function JobDetails() {
               </div>
             </div>
 
-            <Button fullWidth size="lg" onClick={() => { handleHire(selectedCandidate.id); setSelectedCandidate(null); }} disabled={selectedCandidate.status === 'hired' || job.workersHired >= job.workersNeeded}>
-              {selectedCandidate.status === 'hired' ? 'Already Hired' : 'Hire this Worker'}
+            <Button fullWidth size="lg" onClick={() => { handleHire(selectedCandidate.id); setSelectedCandidate(null); }} disabled={selectedCandidate.status === 'hired' || selectedCandidate.status === 'confirmed' || job.workersHired >= job.workersNeeded}>
+              {selectedCandidate.status === 'hired' || selectedCandidate.status === 'confirmed' ? 'Already Hired' : 'Hire this Worker'}
             </Button>
           </div>
         </Modal>

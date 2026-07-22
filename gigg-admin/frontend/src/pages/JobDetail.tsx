@@ -48,7 +48,7 @@ const JobDetail: React.FC = () => {
   }
 
   const { job, applicants, pipeline } = data;
-  const hiredApplicants = applicants.filter((a) => a.status === 'hired' || a.status === 'completed');
+  const hiredApplicants = applicants.filter((a) => a.status === 'confirmed' || a.status === 'completed');
   const totalSlots = hiredApplicants.length * pipeline.tasks.length;
   const completeCount = hiredApplicants.reduce((sum, a) => {
     const completions = pipeline.completionsByApplication[a.id] || [];

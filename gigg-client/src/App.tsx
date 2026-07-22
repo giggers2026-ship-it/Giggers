@@ -23,6 +23,7 @@ import Home from './features/home/pages/Home';
 import Jobs from './features/jobs/pages/Jobs';
 import JobDetails from './features/jobs/pages/JobDetails';
 import PostJob from './features/jobs/pages/PostJob';
+import JobEdit from './features/jobs/pages/JobEdit';
 import AssignWork from './features/jobs/pages/AssignWork';
 import PipelineManager from './features/jobs/pages/PipelineManager';
 import WorkerPipeline from './features/jobs/pages/WorkerPipeline';
@@ -68,6 +69,7 @@ function App() {
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:id" element={<JobDetails />} />
           <Route path="/post-job" element={<PostJob />} />
+          <Route path="/edit-job/:jobId" element={<JobEdit />} />
           <Route path="/assign-work/:id" element={<AssignWork />} />
           <Route path="/pipeline/:jobId/:workerId" element={<PipelineManager />} />
           <Route path="/worker-pipeline/:jobId" element={<WorkerPipeline />} />

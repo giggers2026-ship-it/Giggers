@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 // Routes
 import authRoutes from './routes/auth';
 import usersRoutes from './routes/users';
+import workersRoutes from './routes/workers';
 import jobsRoutes from './routes/jobs';
 import paymentsRoutes from './routes/payments';
 import kycRoutes from './routes/kyc';
@@ -66,6 +67,7 @@ app.get('/api/health', (_req, res) => {
 // ── Routes ───────────────────────────────────────────────────
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/workers', workersRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/kyc', kycRoutes);

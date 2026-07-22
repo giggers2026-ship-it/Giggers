@@ -7,20 +7,22 @@ import { useJobStore } from '../../../store/jobStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useClientStore } from '../../../store/clientStore';
 import { useUIStore } from '../../../store/uiStore';
-import { CheckCircle2, UserCircle2, ChevronRight, Share2 } from 'lucide-react';
+import { CheckCircle2, UserCircle2, ChevronRight, Share2, X } from 'lucide-react';
 import { clsx } from 'clsx';
+import { Badge } from '../../../components/ui';
 
 export default function AssignWork() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { myJobs, jobCandidates, fetchJobCandidates, hireWorker, isLoading } = useJobStore();
+  const { myJobs, jobCandidates, fetchJobCandidates, hireWorker, rejectWorker, isLoading } = useJobStore();
   const { inviteClient } = useClientStore();
   const { addToast } = useUIStore();
 
   const [activeTab, setActiveTab] = useState<'pending' | 'confirmed'>('pending');
   const [selectedWorkers, setSelectedWorkers] = useState<string[]>([]);
   const [isHiring, setIsHiring] = useState(false);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -40,7 +42,9 @@ export default function AssignWork() {
   }
 
   const pendingWorkers = jobCandidates.filter(c => c.status === 'applied');
-  const confirmedWorkers = jobCandidates.filter(c => c.status === 'hired' || c.status === 'completed');
+  const offeredWorkers = jobCandidates.filter(c => c.status === 'hired');
+  const confirmedWorkers = jobCandidates.filter(c => c.status === 'confirmed' || c.status === 'completed');
+  const hiredTabWorkers = [...offeredWorkers, ...confirmedWorkers];
 
   const handleToggleSelection = (applicationId: string) => {
     setSelectedWorkers(prev => 
@@ -87,6 +91,18 @@ export default function AssignWork() {
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(inviteLink).then(() => addToast('Link copied!', 'success'));
+  };
+
+  const handleReject = async (applicationId: string) => {
+    setRejectingId(applicationId);
+    try {
+      await rejectWorker(applicationId);
+      addToast('Applicant rejected', 'info');
+    } catch {
+      addToast('Failed to reject applicant', 'error');
+    } finally {
+      setRejectingId(null);
+    }
   };
 
   return (
@@ -143,7 +159,7 @@ export default function AssignWork() {
                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             )}
           >
-            Confirmed Worker
+            Hired Worker
           </button>
         </div>
 
@@ -200,6 +216,14 @@ export default function AssignWork() {
                     <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">{app.workerName}</h4>
                     <p className="text-xs font-semibold text-slate-500">⭐ {app.workerRating.toFixed(1)} • ID: {app.workerId.slice(0, 6)}</p>
                   </div>
+
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleReject(app.id); }}
+                    disabled={rejectingId === app.id}
+                    className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
               ))
             )}
@@ -208,26 +232,30 @@ export default function AssignWork() {
 
         {!isLoading && activeTab === 'confirmed' && (
           <div className="flex flex-col gap-3">
-            {confirmedWorkers.length === 0 ? (
+            {hiredTabWorkers.length === 0 ? (
               <div className="text-center py-10 text-slate-500 font-bold">No workers assigned yet.</div>
             ) : (
-              confirmedWorkers.map((app) => (
-                <div 
+              hiredTabWorkers.map((app) => (
+                <div
                   key={app.id}
                   onClick={() => navigate(`/pipeline/${job.id}/${app.workerId}`)}
                   className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-dark-700 flex items-center gap-3 cursor-pointer hover:border-slate-300 transition-colors"
                 >
                   {app.workerAvatar ? (
-                    <img src={app.workerAvatar} alt={app.workerName} className="w-10 h-10 rounded-full object-cover border-2 border-green-500" />
+                    <img src={app.workerAvatar} alt={app.workerName} className={clsx("w-10 h-10 rounded-full object-cover border-2", app.status === 'confirmed' || app.status === 'completed' ? "border-green-500" : "border-blue-400")} />
                   ) : (
-                    <div className="w-10 h-10 bg-slate-100 dark:bg-dark-700 rounded-full flex items-center justify-center text-slate-400 border-2 border-green-500">
+                    <div className={clsx("w-10 h-10 bg-slate-100 dark:bg-dark-700 rounded-full flex items-center justify-center text-slate-400 border-2", app.status === 'confirmed' || app.status === 'completed' ? "border-green-500" : "border-blue-400")}>
                       <UserCircle2 size={24} />
                     </div>
                   )}
-                  
+
                   <div className="flex-1">
                     <h4 className="text-sm font-extrabold text-slate-900 dark:text-white">{app.workerName}</h4>
-                    <p className="text-xs font-semibold text-green-600">Confirmed</p>
+                    {app.status === 'hired' ? (
+                      <Badge variant="warning">Awaiting Response</Badge>
+                    ) : (
+                      <Badge variant="success">Confirmed</Badge>
+                    )}
                   </div>
 
                   <ChevronRight size={20} className="text-slate-400" />
