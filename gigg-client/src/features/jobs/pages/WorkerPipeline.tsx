@@ -150,17 +150,26 @@ export default function WorkerPipeline() {
             {tasks.map((task: JobTask, index) => {
               const completion = completionByTaskId.get(task.id);
               const status = completion?.status || 'not_started';
-              const isLocked = status === 'not_started';
               const isWorking = loadingTaskId === task.id;
 
-              const availableAtMs = completion?.availableAt ? new Date(completion.availableAt).getTime() : null;
-              const responseDeadline = availableAtMs !== null ? availableAtMs + task.responseWindowMinutes * 60_000 : null;
-              const isPastResponseWindow = status === 'in_progress' && responseDeadline !== null && now > responseDeadline;
+              const isClockAnchored = Boolean(completion?.opensAt && completion?.deadlineAt);
+              const opensAtMs = completion?.opensAt ? new Date(completion.opensAt).getTime() : null;
+              const isNotYetOpen = isClockAnchored && status === 'not_started' && opensAtMs !== null && now < opensAtMs;
+              const isLocked = status === 'not_started' && !isNotYetOpen;
+
+              const deadlineMs = isClockAnchored
+                ? new Date(completion!.deadlineAt!).getTime()
+                : completion?.availableAt
+                ? new Date(completion.availableAt).getTime() + task.responseWindowMinutes * 60_000
+                : null;
+              const isPastResponseWindow = status === 'in_progress' && deadlineMs !== null && now > deadlineMs;
+
+              const timeLabel = (ms: number) => new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
               return (
                 <div key={task.id} className={clsx(
                   'relative flex items-start justify-between group mb-6 last:mb-0 transition-opacity',
-                  isLocked ? 'opacity-50 grayscale pointer-events-none' : isPastResponseWindow ? 'opacity-60' : 'opacity-100'
+                  isLocked ? 'opacity-50 grayscale pointer-events-none' : isPastResponseWindow || isNotYetOpen ? 'opacity-60' : 'opacity-100'
                 )}>
                   <div className={clsx(
                     'flex items-center justify-center w-10 h-10 rounded-full border-4 shrink-0 z-10 transition-colors',
@@ -185,19 +194,33 @@ export default function WorkerPipeline() {
                     </div>
                     {task.description && <p className="text-xs text-slate-400 mb-2">{task.description}</p>}
 
-                    {status === 'in_progress' && completion && task.completionType === 'tick' && !isPastResponseWindow && (
+                    {isClockAnchored && (status === 'not_started' || status === 'in_progress') && (
+                      <p className="text-[10px] font-bold text-slate-400 mb-2">
+                        {isNotYetOpen
+                          ? `Opens at ${timeLabel(opensAtMs!)}`
+                          : deadlineMs !== null && `Close by ${timeLabel(deadlineMs)}`}
+                      </p>
+                    )}
+
+                    {isNotYetOpen && (
+                      <div className="text-[10px] font-bold text-slate-500 bg-slate-50 dark:bg-dark-700 px-2 py-1 rounded inline-block">
+                        Not open yet
+                      </div>
+                    )}
+
+                    {status === 'in_progress' && completion && task.completionType === 'tick' && !isPastResponseWindow && !isNotYetOpen && (
                       <Button size="sm" className="w-full mt-2 py-1.5" onClick={() => handleTick(completion)} loading={isWorking}>
                         Mark Complete
                       </Button>
                     )}
 
-                    {status === 'in_progress' && completion && task.completionType === 'image' && !isPastResponseWindow && (
+                    {status === 'in_progress' && completion && task.completionType === 'image' && !isPastResponseWindow && !isNotYetOpen && (
                       <Button size="sm" variant="primary" className="w-full mt-2 py-1.5" onClick={() => handleOpenCamera(completion)} loading={isWorking}>
                         Open Camera
                       </Button>
                     )}
 
-                    {status === 'in_progress' && completion && task.completionType === 'form' && !isPastResponseWindow && (
+                    {status === 'in_progress' && completion && task.completionType === 'form' && !isPastResponseWindow && !isNotYetOpen && (
                       <div className="mt-2 flex flex-col gap-2">
                         <Input
                           placeholder="Your response"
@@ -212,7 +235,7 @@ export default function WorkerPipeline() {
 
                     {status === 'in_progress' && isPastResponseWindow && (
                       <div className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded inline-block mt-2">
-                        Response window closed — waiting for auto-review
+                        {isClockAnchored ? 'Window closed — this task will auto-fail' : 'Response window closed — waiting for auto-review'}
                       </div>
                     )}
 

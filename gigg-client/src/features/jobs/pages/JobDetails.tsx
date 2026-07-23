@@ -8,6 +8,7 @@ import type { Application } from '../../../types';
 import { useAuthStore } from '../../../store/authStore';
 import { useWalletStore } from '../../../store/walletStore';
 import { useUIStore } from '../../../store/uiStore';
+import { parseDosAndDonts } from '../constants';
 
 export default function JobDetails() {
   const { id } = useParams();
@@ -122,17 +123,23 @@ export default function JobDetails() {
             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-dark-600 flex items-center justify-center text-slate-500 flex-shrink-0"><MapPin size={18} /></div>
             <div>
               <p className="text-sm font-bold text-slate-900 dark:text-white">{job.location}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 leading-relaxed pr-4">{job.address}</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl overflow-hidden border border-slate-100 dark:border-dark-600">
-          <MapPlaceholder height="h-32" />
-          <div className="bg-slate-50 dark:bg-dark-700 p-3 text-center border-t border-slate-100 dark:border-dark-600">
-            <button className="text-xs font-bold text-primary-600 dark:text-primary-400">Open in Maps →</button>
+        {job.address && (
+          <div className="mt-6 rounded-2xl overflow-hidden border border-slate-100 dark:border-dark-600">
+            <MapPlaceholder height="h-32" />
+            <a
+              href={job.address}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-slate-50 dark:bg-dark-700 p-3 text-center border-t border-slate-100 dark:border-dark-600 text-xs font-bold text-primary-600 dark:text-primary-400"
+            >
+              Open in Maps →
+            </a>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="px-5 py-6 bg-white dark:bg-dark-800 shadow-sm mb-2">
@@ -166,14 +173,25 @@ export default function JobDetails() {
           </div>
         </div>
         
-        {job.dosAndDonts && (
-          <div className="mt-4">
-            <p className="text-xs text-slate-500 font-bold mb-1">Do's & Don'ts</p>
-            <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">
-              {job.dosAndDonts}
-            </p>
-          </div>
-        )}
+        {job.dosAndDonts && (() => {
+          const { dos, donts } = parseDosAndDonts(job.dosAndDonts);
+          return (
+            <>
+              {dos && (
+                <div className="mt-4">
+                  <p className="text-xs text-slate-500 font-bold mb-1">Do's</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{dos}</p>
+                </div>
+              )}
+              {donts && (
+                <div className="mt-4">
+                  <p className="text-xs text-slate-500 font-bold mb-1">Don'ts</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{donts}</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
         
         {job.clientName && (
           <div className="mt-4">
@@ -221,8 +239,14 @@ export default function JobDetails() {
           </div>
         ) : isConfirmed ? (
           <div className="flex flex-col gap-3">
-            <Button fullWidth size="lg" disabled className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-200">
-              <CheckCircle size={18} className="mr-2" /> You're Hired!
+            <Button 
+              fullWidth 
+              size="lg" 
+              variant="primary"
+              onClick={() => navigate(`/worker-pipeline/${job.id}`)}
+              className="bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white"
+            >
+              <CheckCircle size={18} className="mr-2" /> Go to Job Pipeline
             </Button>
             <Button
               fullWidth

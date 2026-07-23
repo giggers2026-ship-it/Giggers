@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AppHeader } from '../../../components/layout/Navigation';
-import { Button } from '../../../components/ui';
+import { Button, Badge } from '../../../components/ui';
 import { useJobStore } from '../../../store/jobStore';
 import { usePipelineStore } from '../../../store/pipelineStore';
 import { useUIStore } from '../../../store/uiStore';
-import { CheckCircle2, Circle, Clock, XCircle, UserSquare2, Image as ImageIcon } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, XCircle, UserSquare2, Image as ImageIcon, RotateCcw } from 'lucide-react';
 import { clsx } from 'clsx';
 import type { TaskCompletion } from '../../../types';
 
@@ -28,7 +28,7 @@ export default function PipelineManager() {
   const { jobId, workerId } = useParams();
   const navigate = useNavigate();
   const { myJobs, jobCandidates, fetchJobCandidates } = useJobStore();
-  const { tasks, completions, isLoading, fetchCompletions, submitTick, reviewCompletion } = usePipelineStore();
+  const { tasks, completions, isLoading, fetchCompletions, reviewCompletion, employerCompleteTask, employerReopenTask } = usePipelineStore();
   const { addToast } = useUIStore();
 
   const job = myJobs.find((j) => j.id === jobId);
@@ -51,36 +51,40 @@ export default function PipelineManager() {
   }
 
   const completionByTaskId = new Map(completions.map((c) => [c.jobTaskId, c]));
-  const allComplete = tasks.length > 0 && tasks.every((t) => completionByTaskId.get(t.id)?.status === 'complete');
+  const isJobComplete = application.status === 'completed';
 
-  const handleTap = async (completion: TaskCompletion | undefined) => {
-    if (!completion) return;
-    if (completion.status === 'complete' || completion.status === 'failed') return;
-    if (completion.status === 'submitted') return; // handled via approve/reject buttons instead
-    try {
-      await submitTick(completion.id);
-      addToast('Task marked complete', 'success');
-    } catch {
-      addToast('Failed to update task', 'error');
-    }
+  const refreshAfterOverride = () => {
+    if (jobId) fetchJobCandidates(jobId);
   };
 
   const handleReview = async (completion: TaskCompletion, approve: boolean) => {
     try {
       await reviewCompletion(completion.id, approve, approve ? undefined : 'Rejected by employer');
       addToast(approve ? 'Task approved' : 'Task rejected', approve ? 'success' : 'warning');
+      refreshAfterOverride();
     } catch {
       addToast('Failed to review task', 'error');
     }
   };
 
-  const handleMarkPresent = () => {
-    if (!allComplete) {
-      addToast('Please complete all tasks first', 'warning');
-      return;
+  const handleForceComplete = async (completion: TaskCompletion) => {
+    try {
+      await employerCompleteTask(completion.id);
+      addToast('Task marked complete', 'success');
+      refreshAfterOverride();
+    } catch {
+      addToast('Failed to complete task', 'error');
     }
-    addToast('Worker marked as Present!', 'success');
-    navigate(-1);
+  };
+
+  const handleReopen = async (completion: TaskCompletion) => {
+    try {
+      await employerReopenTask(completion.id);
+      addToast('Task reopened for the worker', 'success');
+      refreshAfterOverride();
+    } catch {
+      addToast('Failed to reopen task', 'error');
+    }
   };
 
   return (
@@ -96,10 +100,11 @@ export default function PipelineManager() {
               <UserSquare2 size={32} />
             </div>
           )}
-          <div>
+          <div className="flex-1">
             <h2 className="text-lg font-extrabold text-slate-900 dark:text-white">{application.workerName}</h2>
             <p className="text-sm font-semibold text-slate-500">ID: {application.workerId.slice(0, 6)}</p>
           </div>
+          {isJobComplete && <Badge variant="success">Completed</Badge>}
         </div>
 
         <div className="bg-white dark:bg-dark-800 rounded-2xl p-5 shadow-sm border border-slate-100 dark:border-dark-700">
@@ -112,9 +117,8 @@ export default function PipelineManager() {
               return (
                 <div key={task.id} className="relative flex items-start justify-between mb-6 last:mb-0">
                   <div
-                    onClick={() => handleTap(completion)}
                     className={clsx(
-                      'flex items-center justify-center w-10 h-10 rounded-full border-4 shrink-0 cursor-pointer z-10 transition-colors',
+                      'flex items-center justify-center w-10 h-10 rounded-full border-4 shrink-0 z-10 transition-colors',
                       STATUS_STYLES[status]
                     )}
                   >
@@ -153,18 +157,29 @@ export default function PipelineManager() {
                         <Button size="sm" onClick={() => handleReview(completion!, true)}>Approve</Button>
                       </div>
                     )}
+
+                    {completion && status !== 'complete' && (
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-dark-700">
+                        {status === 'failed' && (
+                          <Button size="sm" variant="outline" onClick={() => handleReopen(completion)} leftIcon={<RotateCcw size={14} />}>
+                            Reopen
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => handleForceComplete(completion)}>
+                          Mark Complete
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-dark-800/90 backdrop-blur-md border-t border-slate-100 dark:border-dark-600 z-40 max-w-lg mx-auto">
-        <Button fullWidth size="lg" onClick={handleMarkPresent} disabled={!allComplete}>
-          {allComplete ? 'Mark as Present' : 'Complete all tasks'}
-        </Button>
+        <p className="text-xs text-slate-400 font-medium text-center mt-4 px-4">
+          "Mark Complete" / "Reopen" are for emergencies only (e.g. the worker's phone died mid-shift) — normally each task completes automatically as the worker submits it, and the job finishes on its own once every task is done.
+        </p>
       </div>
     </div>
   );

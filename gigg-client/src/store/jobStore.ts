@@ -394,7 +394,7 @@ export const useJobStore = create<JobState>((set, get) => ({
           id, name, avatar, rating, review_count, city, area, bio,
           skills, languages, categories, age, gender, is_verified,
           is_approved, aadhaar_verified, selfie_verified, completed_jobs,
-          total_earnings, attendance_rate, phone, email, created_at
+          total_earnings, attendance_rate, phone, email, created_at, kyc_status
         )
       `)
       .eq('job_id', jobId)

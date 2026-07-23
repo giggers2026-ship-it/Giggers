@@ -31,6 +31,7 @@ import PipelineBuilder from './features/jobs/pages/PipelineBuilder';
 import ClientInviteRedeem from './features/jobs/pages/ClientInviteRedeem';
 import ClientJobList from './features/jobs/pages/ClientJobList';
 import ClientPipelineView from './features/jobs/pages/ClientPipelineView';
+import EmployerWorkers from './features/jobs/pages/EmployerWorkers';
 
 // Profile
 import Profile from './features/profile/pages/Profile';
@@ -74,6 +75,7 @@ function App() {
           <Route path="/pipeline/:jobId/:workerId" element={<PipelineManager />} />
           <Route path="/worker-pipeline/:jobId" element={<WorkerPipeline />} />
           <Route path="/pipeline-builder/:jobId" element={<PipelineBuilder />} />
+          <Route path="/workers" element={<EmployerWorkers />} />
           <Route path="/profile" element={<Profile />} />
 
           {/* Client (read-only, magic-link) */}

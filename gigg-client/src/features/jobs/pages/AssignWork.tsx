@@ -2,14 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { AppHeader } from '../../../components/layout/Navigation';
-import { Button, Input, Modal } from '../../../components/ui';
+import { Button, Input, Modal, Avatar, Chip } from '../../../components/ui';
 import { useJobStore } from '../../../store/jobStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useClientStore } from '../../../store/clientStore';
 import { useUIStore } from '../../../store/uiStore';
-import { CheckCircle2, UserCircle2, ChevronRight, Share2, X } from 'lucide-react';
+import { CheckCircle2, UserCircle2, ChevronRight, Share2, X, Info, Phone, MapPin, Briefcase, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Badge } from '../../../components/ui';
+import type { Application } from '../../../types';
 
 export default function AssignWork() {
   const { id } = useParams();
@@ -28,6 +29,7 @@ export default function AssignWork() {
   const [clientPhone, setClientPhone] = useState('');
   const [inviteLink, setInviteLink] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [profileApp, setProfileApp] = useState<Application | null>(null);
 
   const job = myJobs.find(j => j.id === id);
 
@@ -218,6 +220,13 @@ export default function AssignWork() {
                   </div>
 
                   <button
+                    onClick={(e) => { e.stopPropagation(); setProfileApp(app); }}
+                    className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-primary-600 rounded-full hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                  >
+                    <Info size={16} />
+                  </button>
+
+                  <button
                     onClick={(e) => { e.stopPropagation(); handleReject(app.id); }}
                     disabled={rejectingId === app.id}
                     className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
@@ -279,6 +288,126 @@ export default function AssignWork() {
           </Button>
         </div>
       )}
+
+      {/* Worker Verification Modal */}
+      <Modal open={!!profileApp} onClose={() => setProfileApp(null)} title="Verify Worker">
+        {profileApp && (
+          <div className="flex flex-col gap-5 py-2">
+            <div className="flex items-center gap-4">
+              <Avatar src={profileApp.workerProfile?.selfie || profileApp.workerAvatar} name={profileApp.workerName} size="xl" />
+              <div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white">{profileApp.workerName}</h3>
+                <p className="text-sm font-semibold text-slate-500 flex items-center gap-1">
+                  <MapPin size={14} /> {profileApp.workerProfile?.city}{profileApp.workerProfile?.area ? `, ${profileApp.workerProfile.area}` : ''}
+                </p>
+                <div className="flex gap-2 mt-2">
+                  <Badge variant="warning" className="flex gap-1 items-center">⭐ {profileApp.workerRating.toFixed(1)}</Badge>
+                  <Badge variant="success">{profileApp.workerProfile?.attendanceRate ?? 100}% Attendance</Badge>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-slate-500 mb-2">Verification Status</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className={clsx(
+                  'p-3 rounded-xl border flex items-center gap-2',
+                  profileApp.workerProfile?.kycStatus === 'approved'
+                    ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30'
+                    : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800/30'
+                )}>
+                  {profileApp.workerProfile?.kycStatus === 'approved' ? (
+                    <ShieldCheck size={18} className="text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <ShieldAlert size={18} className="text-amber-600 flex-shrink-0" />
+                  )}
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">KYC</p>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white capitalize">{profileApp.workerProfile?.kycStatus?.replace('_', ' ') || 'Not started'}</p>
+                  </div>
+                </div>
+                <div className={clsx(
+                  'p-3 rounded-xl border flex items-center gap-2',
+                  profileApp.workerProfile?.aadhaarVerified
+                    ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800/30'
+                    : 'bg-amber-50 dark:bg-amber-900/10 border-amber-100 dark:border-amber-800/30'
+                )}>
+                  {profileApp.workerProfile?.aadhaarVerified ? (
+                    <ShieldCheck size={18} className="text-emerald-600 flex-shrink-0" />
+                  ) : (
+                    <ShieldAlert size={18} className="text-amber-600 flex-shrink-0" />
+                  )}
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Aadhaar</p>
+                    <p className="text-xs font-bold text-slate-900 dark:text-white">{profileApp.workerProfile?.aadhaarVerified ? 'Verified' : 'Unverified'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-slate-500 mb-2">Contact</p>
+              <a
+                href={profileApp.workerProfile?.phone ? `tel:${profileApp.workerProfile.phone}` : undefined}
+                className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 dark:bg-dark-800 border border-slate-100 dark:border-dark-600 text-sm font-bold text-slate-900 dark:text-white"
+              >
+                <Phone size={16} className="text-primary-500" /> {profileApp.workerProfile?.phone || 'Not available'}
+              </a>
+            </div>
+
+            <div>
+              <p className="text-xs font-bold text-slate-500 mb-2">Track Record</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 dark:bg-dark-800 p-3 rounded-xl border border-slate-100 dark:border-dark-600 flex items-center gap-2">
+                  <Briefcase size={16} className="text-primary-500 flex-shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Completed Jobs</p>
+                    <p className="text-sm font-bold text-slate-900 dark:text-white">{profileApp.workerProfile?.completedJobs ?? 0}</p>
+                  </div>
+                </div>
+                <div className="bg-slate-50 dark:bg-dark-800 p-3 rounded-xl border border-slate-100 dark:border-dark-600">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">Age / Gender</p>
+                  <p className="text-sm font-bold text-slate-900 dark:text-white capitalize">{profileApp.workerProfile?.age ?? '—'} • {profileApp.workerProfile?.gender ?? '—'}</p>
+                </div>
+              </div>
+            </div>
+
+            {profileApp.workerProfile?.bio && (
+              <div className="bg-slate-50 dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-dark-600">
+                <p className="text-xs font-bold text-slate-500 mb-2">About</p>
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{profileApp.workerProfile.bio}</p>
+              </div>
+            )}
+
+            {!!profileApp.workerProfile?.skills?.length && (
+              <div>
+                <p className="text-xs font-bold text-slate-500 mb-2">Skills</p>
+                <div className="flex flex-wrap gap-2">
+                  {profileApp.workerProfile.skills.map((skill) => (
+                    <Chip key={skill} active={false}>{skill}</Chip>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => { handleReject(profileApp.id); setProfileApp(null); }}
+              >
+                Reject
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => { handleToggleSelection(profileApp.id); setProfileApp(null); }}
+              >
+                {selectedWorkers.includes(profileApp.id) ? 'Selected — Deselect' : 'Select to Hire'}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

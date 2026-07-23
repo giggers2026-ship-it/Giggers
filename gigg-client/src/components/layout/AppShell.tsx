@@ -23,7 +23,7 @@ const isClientInvitePath = (pathname: string) => pathname.startsWith('/client/in
 const isClientPath = (pathname: string) => pathname.startsWith('/client/');
 
 export const AppShell: React.FC = () => {
-  const { isAuthenticated, user, refreshUser } = useAuthStore();
+  const { isAuthenticated, user, refreshUser, hasHydrated } = useAuthStore();
   const { fetchWallet } = useWalletStore();
   const { toasts, removeToast, theme } = useUIStore();
   const { subscribeToNotifications } = useNotificationStore();
@@ -34,11 +34,16 @@ export const AppShell: React.FC = () => {
   const isOnboardingPath = ONBOARDING_PATHS.includes(location.pathname);
 
   // 1. Not logged in + trying to access protected route → go to welcome
+  // Gated on hasHydrated: the persisted session loads asynchronously after
+  // this store's initial (unauthenticated) state, so on a fresh page
+  // load/refresh isAuthenticated briefly reads false even for an already
+  // logged-in user. Checking it before hydration finishes would bounce
+  // them to /welcome despite having a valid session.
   useEffect(() => {
-    if (!isAuthenticated && !isPublicPath && !isOnboardingPath) {
+    if (hasHydrated && !isAuthenticated && !isPublicPath && !isOnboardingPath) {
       navigate('/welcome');
     }
-  }, [isAuthenticated, isPublicPath, isOnboardingPath, navigate]);
+  }, [hasHydrated, isAuthenticated, isPublicPath, isOnboardingPath, navigate]);
 
   // 2. Logged in → always refresh user status silently
   useEffect(() => {
@@ -123,6 +128,15 @@ export const AppShell: React.FC = () => {
     !isPendingApproval &&
     !isClientPath(location.pathname) &&
     location.pathname !== '/';
+
+  // Block rendering until the persisted session has loaded, on protected
+  // routes only — otherwise a not-yet-hydrated (falsely unauthenticated)
+  // state would flash the wrong content before the redirect-guard effect
+  // above gets a chance to run. Public routes render immediately since
+  // they don't depend on auth state.
+  if (!hasHydrated && !isPublicPath && !isOnboardingPath) {
+    return <div className="min-h-screen bg-slate-50 dark:bg-dark-900" />;
+  }
 
   if (isPendingApproval) {
     return (

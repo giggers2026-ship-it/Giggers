@@ -191,6 +191,17 @@ export interface JobTask {
   formSchema?: FormField[];
   responseWindowMinutes: number;
   autoFailMinutes: number;
+  /** Minutes before/after the anchor time (job reporting_time for opening,
+   * job end_time for closing, or this task's own anchorTime for a middle
+   * task) that the task's clock window opens/closes. Only used when the
+   * task is clock-anchored — see anchorTime. */
+  openMinutesBefore: number;
+  openMinutesAfter: number;
+  /** 'HH:MM' clock time a middle task is anchored to (employer-set,
+   * optional). Opening/closing tasks ignore this — they always anchor to
+   * the job's reporting_time/end_time. Undefined means the middle task
+   * keeps the relative-timer behavior instead of a clock window. */
+  anchorTime?: string;
   requiresReview: boolean;
 }
 
@@ -205,6 +216,9 @@ export interface TaskCompletion {
   submittedAt?: string;
   reviewedAt?: string;
   rejectionReason?: string;
+  /** Set only for opening/closing (clock-anchored) tasks — the job-clock-derived open/deadline instants. */
+  opensAt?: string;
+  deadlineAt?: string;
 }
 
 export interface JobClient {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
@@ -9,6 +9,14 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** True once the persisted session has been read back from sessionStorage.
+   * Route guards (see AppShell) must wait for this before treating
+   * isAuthenticated as authoritative — persist rehydration happens
+   * asynchronously after the store's initial (unauthenticated) state, so
+   * checking isAuthenticated too early on a fresh page load/refresh always
+   * reads false and incorrectly bounces a logged-in user to /welcome. */
+  hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   sendOtp: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string, role?: 'worker' | 'employer') => Promise<boolean>;
   register: (data: Partial<UserProfile> & { role: 'worker' | 'employer'; otp: string }) => Promise<void>;
@@ -73,6 +81,8 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      hasHydrated: false,
+      setHasHydrated: (v) => set({ hasHydrated: v }),
       sendOtp: async (phone: string) => {
         set({ isLoading: true });
         try {
@@ -163,6 +173,18 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: false });
       },
     }),
-    { name: 'giggers-auth', partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }) }
+    {
+      name: 'giggers-auth',
+      // sessionStorage, not localStorage: each browser tab gets its own
+      // independent session. localStorage is shared across every tab of
+      // the browser, so logging in as employer in one tab and worker in
+      // another overwrites the same key — a refresh in either tab then
+      // re-reads whichever login happened last, silently switching roles.
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
   )
 );

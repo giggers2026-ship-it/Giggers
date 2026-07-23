@@ -13,13 +13,42 @@ const COMPLETION_TYPES: { value: TaskDraft['completionType']; label: string; ico
 ];
 
 function emptyTask(kind: TaskDraft['kind']): TaskDraft {
+  if (kind === 'opening') {
+    return {
+      kind,
+      title: 'Confirm Arrival',
+      description: 'Upload a photo showing you have arrived at the venue.',
+      completionType: 'image',
+      responseWindowMinutes: 5,
+      autoFailMinutes: 10,
+      openMinutesBefore: 10,
+      openMinutesAfter: 10,
+      requiresReview: true,
+    };
+  }
+  if (kind === 'closing') {
+    return {
+      kind,
+      title: 'Confirm Checkout',
+      description: 'Upload a photo before you leave the venue.',
+      completionType: 'image',
+      responseWindowMinutes: 5,
+      autoFailMinutes: 10,
+      openMinutesBefore: 10,
+      openMinutesAfter: 10,
+      requiresReview: true,
+    };
+  }
   return {
     kind,
-    title: kind === 'opening' ? 'Opening Task' : kind === 'closing' ? 'Closing Task' : '',
+    title: '',
     description: '',
     completionType: 'tick',
     responseWindowMinutes: 5,
     autoFailMinutes: 10,
+    openMinutesBefore: 10,
+    openMinutesAfter: 10,
+    anchorTime: undefined,
     requiresReview: true,
   };
 }
@@ -34,6 +63,7 @@ export default function PipelineBuilder() {
   const [submitting, setSubmitting] = useState(false);
 
   const middleTasks = tasks.filter((t) => t.kind === 'task');
+  const openingIndex = tasks.findIndex((t) => t.kind === 'opening');
 
   const updateTask = (index: number, updates: Partial<TaskDraft>) => {
     setTasks((prev) => prev.map((t, i) => (i === index ? { ...t, ...updates } : t)));
@@ -41,9 +71,9 @@ export default function PipelineBuilder() {
 
   const addMiddleTask = () => {
     setTasks((prev) => {
-      const closingIndex = prev.findIndex((t) => t.kind === 'closing');
+      const insertAt = prev.findIndex((t) => t.kind === 'closing');
       const next = [...prev];
-      next.splice(closingIndex, 0, emptyTask('task'));
+      next.splice(insertAt, 0, emptyTask('task'));
       return next;
     });
   };
@@ -72,6 +102,9 @@ export default function PipelineBuilder() {
 
   const renderTask = (task: TaskDraft, index: number) => {
     const isFixed = task.kind === 'opening' || task.kind === 'closing';
+    const anchorLabel = task.kind === 'opening' ? 'job reporting time' : task.kind === 'closing' ? 'job end time' : null;
+    const isMiddleClockAnchored = task.kind === 'task' && task.anchorTime !== undefined;
+
     return (
       <div key={index} className="bg-white dark:bg-dark-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-dark-700 flex flex-col gap-3">
         <div className="flex items-center justify-between">
@@ -117,22 +150,89 @@ export default function PipelineBuilder() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Response window (min)"
-            type="number"
-            min="1"
-            value={task.responseWindowMinutes}
-            onChange={(e) => updateTask(index, { responseWindowMinutes: Number(e.target.value) || 5 })}
-          />
-          <Input
-            label="Auto-fail after (min)"
-            type="number"
-            min="1"
-            value={task.autoFailMinutes}
-            onChange={(e) => updateTask(index, { autoFailMinutes: Number(e.target.value) || 10 })}
-          />
-        </div>
+        {anchorLabel ? (
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-2">
+              Window is timed to the {anchorLabel}, not to when the worker opens the app.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="Opens (min before)"
+                type="number"
+                min="0"
+                value={task.openMinutesBefore}
+                onChange={(e) => updateTask(index, { openMinutesBefore: Number(e.target.value) || 0 })}
+              />
+              <Input
+                label="Auto-fail (min after)"
+                type="number"
+                min="0"
+                value={task.openMinutesAfter}
+                onChange={(e) => updateTask(index, { openMinutesAfter: Number(e.target.value) || 0 })}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => updateTask(index, { anchorTime: isMiddleClockAnchored ? undefined : '12:00' })}
+              className="flex items-center gap-2 text-xs font-bold text-primary-600 dark:text-primary-400 self-start"
+            >
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center ${isMiddleClockAnchored ? 'bg-primary-500 border-primary-500' : 'border-slate-300 dark:border-dark-500'}`}>
+                {isMiddleClockAnchored && <span className="w-1.5 h-1.5 bg-white rounded-sm" />}
+              </span>
+              Anchor this task to a specific time
+            </button>
+
+            {isMiddleClockAnchored ? (
+              <>
+                <Input
+                  label="At"
+                  type="time"
+                  value={task.anchorTime}
+                  onChange={(e) => updateTask(index, { anchorTime: e.target.value })}
+                />
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium -mt-1">
+                  Window is timed to this clock time (on the job's date), not to when the previous task finishes.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Opens (min before)"
+                    type="number"
+                    min="0"
+                    value={task.openMinutesBefore}
+                    onChange={(e) => updateTask(index, { openMinutesBefore: Number(e.target.value) || 0 })}
+                  />
+                  <Input
+                    label="Auto-fail (min after)"
+                    type="number"
+                    min="0"
+                    value={task.openMinutesAfter}
+                    onChange={(e) => updateTask(index, { openMinutesAfter: Number(e.target.value) || 0 })}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Response window (min)"
+                  type="number"
+                  min="1"
+                  value={task.responseWindowMinutes}
+                  onChange={(e) => updateTask(index, { responseWindowMinutes: Number(e.target.value) || 5 })}
+                />
+                <Input
+                  label="Auto-fail after (min)"
+                  type="number"
+                  min="1"
+                  value={task.autoFailMinutes}
+                  onChange={(e) => updateTask(index, { autoFailMinutes: Number(e.target.value) || 10 })}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -146,7 +246,7 @@ export default function PipelineBuilder() {
           Define the tasks a worker must complete for this job, from check-in to sign-off.
         </p>
 
-        {tasks.map((task, index) => renderTask(task, index))}
+        {tasks.slice(0, openingIndex + 1).map((task, index) => renderTask(task, index))}
 
         <button
           onClick={addMiddleTask}
@@ -154,6 +254,8 @@ export default function PipelineBuilder() {
         >
           <Plus size={18} /> Add Task
         </button>
+
+        {tasks.slice(openingIndex + 1).map((task, i) => renderTask(task, openingIndex + 1 + i))}
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-dark-800/90 backdrop-blur-md border-t border-slate-100 dark:border-dark-600 z-40 max-w-lg mx-auto">

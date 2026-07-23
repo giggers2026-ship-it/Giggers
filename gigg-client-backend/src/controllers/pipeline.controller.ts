@@ -16,11 +16,46 @@ function mapTask(row: Record<string, any>) {
     formSchema: row.form_schema || undefined,
     responseWindowMinutes: row.response_window_minutes,
     autoFailMinutes: row.auto_fail_minutes,
+    openMinutesBefore: row.open_minutes_before,
+    openMinutesAfter: row.open_minutes_after,
+    anchorTime: row.anchor_time || undefined,
     requiresReview: Boolean(row.requires_review),
   };
 }
 
-async function mapCompletion(row: Record<string, any>) {
+/** A task is clock-anchored to a specific time-of-day on the job's date
+ * instead of "whenever the worker opens the task": opening tasks anchor to
+ * job.reporting_time, closing tasks to job.end_time, and middle 'task' rows
+ * anchor to their own task.anchor_time if the employer set one (otherwise
+ * they keep the old relative-timer behavior — see the null return below).
+ * Returns the open/deadline instants for that anchor, or null if the task
+ * isn't clock-anchored or the anchor time is missing.
+ *
+ * If `completion.manually_reopened_at` is set (employer emergency reopen —
+ * see employerReopenTask), the window is instead computed relative to that
+ * reopen instant, so a task whose original clock deadline already passed
+ * gets a genuinely fresh window instead of being auto-failed again on the
+ * very next read. */
+function clockWindowFor(task: Record<string, any>, job: Record<string, any>, completion?: Record<string, any>): { opensAt: Date; deadline: Date } | null {
+  const time = task.kind === 'opening' ? job.reporting_time : task.kind === 'closing' ? job.end_time : task.anchor_time;
+  if (!time) return null;
+
+  if (completion?.manually_reopened_at) {
+    const reopenedAt = new Date(completion.manually_reopened_at);
+    return { opensAt: reopenedAt, deadline: new Date(reopenedAt.getTime() + task.open_minutes_after * 60_000) };
+  }
+
+  if (!job.date) return null;
+
+  const anchor = new Date(`${job.date}T${time}`);
+  if (Number.isNaN(anchor.getTime())) return null;
+
+  const opensAt = new Date(anchor.getTime() - task.open_minutes_before * 60_000);
+  const deadline = new Date(anchor.getTime() + task.open_minutes_after * 60_000);
+  return { opensAt, deadline };
+}
+
+async function mapCompletion(row: Record<string, any>, clockWindow?: { opensAt: Date; deadline: Date } | null) {
   const imageUrl = await getSignedTaskImageUrl(row.image_path);
   return {
     id: row.id,
@@ -33,21 +68,33 @@ async function mapCompletion(row: Record<string, any>) {
     submittedAt: row.submitted_at || undefined,
     reviewedAt: row.reviewed_at || undefined,
     rejectionReason: row.rejection_reason || undefined,
+    opensAt: clockWindow?.opensAt.toISOString(),
+    deadlineAt: clockWindow?.deadline.toISOString(),
   };
 }
 
-/** Applies the auto-fail rule: any 'submitted' or 'in_progress' row whose
- * available_at + auto_fail_minutes has passed becomes 'failed'. Lazy check
- * on read, no cron needed. */
-async function applyAutoFail(completions: Record<string, any>[], tasksById: Map<string, Record<string, any>>) {
+/** Applies the auto-fail rule: any 'submitted' or 'in_progress' row past its
+ * deadline becomes 'failed'. Clock-anchored tasks (opening/closing, or a
+ * middle task with an anchor_time set) use the job-clock window (see
+ * clockWindowFor); everything else uses the relative timer (available_at +
+ * auto_fail_minutes). Lazy check on read, no cron needed. */
+async function applyAutoFail(completions: Record<string, any>[], tasksById: Map<string, Record<string, any>>, job: Record<string, any>) {
   const now = Date.now();
   const toFail: string[] = [];
   for (const c of completions) {
     if (c.status !== 'in_progress' && c.status !== 'submitted') continue;
-    if (!c.available_at) continue;
     const task = tasksById.get(c.job_task_id);
     if (!task) continue;
-    const deadline = new Date(c.available_at).getTime() + task.auto_fail_minutes * 60_000;
+
+    const clockWindow = clockWindowFor(task, job, c);
+    let deadline: number;
+    if (clockWindow) {
+      deadline = clockWindow.deadline.getTime();
+    } else {
+      if (!c.available_at) continue;
+      deadline = new Date(c.available_at).getTime() + task.auto_fail_minutes * 60_000;
+    }
+
     if (now > deadline) {
       c.status = 'failed';
       toFail.push(c.id);
@@ -55,6 +102,41 @@ async function applyAutoFail(completions: Record<string, any>[], tasksById: Map<
   }
   if (toFail.length > 0) {
     await supabase.from('application_task_completions').update({ status: 'failed' }).in('id', toFail);
+  }
+}
+
+/** Flips a 'not_started' completion to 'in_progress' once its task is next
+ * in line (every earlier task is 'complete') and, if clock-anchored, the
+ * job's window has opened. Needed because there's no cron — without this,
+ * a clock-anchored task created before its window opens (e.g. the opening
+ * task, seeded as soon as the worker first opens the pipeline, well before
+ * the job's reporting time) would stay locked forever since nothing else
+ * re-checks it later. Mutates `completions` in place to keep the caller's
+ * subsequent auto-fail/response mapping consistent within this request. */
+async function wakeClockAnchoredTasks(completions: Record<string, any>[], tasks: Record<string, any>[], job: Record<string, any>) {
+  const completionByTaskId = new Map(completions.map((c) => [c.job_task_id, c]));
+  const toWake: string[] = [];
+  const now = new Date().toISOString();
+
+  const sortedTasks = [...tasks].sort((a, b) => a.sort_order - b.sort_order);
+  for (let i = 0; i < sortedTasks.length; i++) {
+    const task = sortedTasks[i];
+    const completion = completionByTaskId.get(task.id);
+    if (!completion || completion.status !== 'not_started') continue;
+
+    const priorAllComplete = sortedTasks.slice(0, i).every((t) => completionByTaskId.get(t.id)?.status === 'complete');
+    if (!priorAllComplete) continue;
+
+    const clockWindow = clockWindowFor(task, job);
+    if (!clockWindow || Date.now() < clockWindow.opensAt.getTime()) continue;
+
+    completion.status = 'in_progress';
+    completion.available_at = now;
+    toWake.push(completion.id);
+  }
+
+  if (toWake.length > 0) {
+    await supabase.from('application_task_completions').update({ status: 'in_progress', available_at: now }).in('id', toWake);
   }
 }
 
@@ -82,6 +164,9 @@ const taskInputSchema = z.object({
   formSchema: z.array(z.object({ label: z.string(), type: z.enum(['text', 'number', 'select']), options: z.array(z.string()).optional() })).optional(),
   responseWindowMinutes: z.number().int().positive().optional().default(5),
   autoFailMinutes: z.number().int().positive().optional().default(10),
+  openMinutesBefore: z.number().int().nonnegative().optional().default(10),
+  openMinutesAfter: z.number().int().nonnegative().optional().default(10),
+  anchorTime: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   requiresReview: z.boolean().optional().default(true),
 });
 
@@ -127,6 +212,9 @@ export async function saveJobTasks(req: AuthenticatedRequest, res: Response): Pr
     form_schema: t.formSchema || null,
     response_window_minutes: t.responseWindowMinutes,
     auto_fail_minutes: t.autoFailMinutes,
+    open_minutes_before: t.openMinutesBefore,
+    open_minutes_after: t.openMinutesAfter,
+    anchor_time: t.anchorTime || null,
     requires_review: t.requiresReview,
   }));
 
@@ -166,6 +254,9 @@ export async function updateTask(req: AuthenticatedRequest, res: Response): Prom
   if (d.formSchema !== undefined) updates.form_schema = d.formSchema;
   if (d.responseWindowMinutes !== undefined) updates.response_window_minutes = d.responseWindowMinutes;
   if (d.autoFailMinutes !== undefined) updates.auto_fail_minutes = d.autoFailMinutes;
+  if (d.openMinutesBefore !== undefined) updates.open_minutes_before = d.openMinutesBefore;
+  if (d.openMinutesAfter !== undefined) updates.open_minutes_after = d.openMinutesAfter;
+  if (d.anchorTime !== undefined) updates.anchor_time = d.anchorTime || null;
   if (d.requiresReview !== undefined) updates.requires_review = d.requiresReview;
 
   const { data: updated, error } = await supabase.from('job_tasks').update(updates).eq('id', taskId).select('*').single();
@@ -237,6 +328,14 @@ const LEGACY_SEED_TASKS = [
  * job_tasks rows. Seed them once, lazily, with the legacy fixed 4-step
  * list so old/in-flight jobs keep working under the new pipeline UI. */
 async function seedLegacyTasksIfMissing(jobId: string) {
+  const { data: job } = await supabase.from('jobs').select('created_at').eq('id', jobId).single();
+  if (!job) return;
+
+  // Only seed legacy tasks for jobs created before we shipped the custom pipeline builder
+  if (new Date(job.created_at) >= new Date('2026-07-21T00:00:00.000Z')) {
+    return;
+  }
+
   const { count } = await supabase.from('job_tasks').select('id', { count: 'exact', head: true }).eq('job_id', jobId);
   if (count && count > 0) return;
 
@@ -268,6 +367,8 @@ export async function getCompletions(req: AuthenticatedRequest, res: Response): 
     return;
   }
 
+  const { data: job } = await supabase.from('jobs').select('date, reporting_time, end_time').eq('id', jobId).single();
+
   await seedLegacyTasksIfMissing(jobId);
 
   const { data: tasks } = await supabase.from('job_tasks').select('*').eq('job_id', jobId).order('sort_order', { ascending: true });
@@ -283,16 +384,20 @@ export async function getCompletions(req: AuthenticatedRequest, res: Response): 
     .eq('application_id', applicationId);
 
   // Lazily create missing completion rows so every task always has one.
-  // The very first task (lowest sort_order) starts 'in_progress' and available
-  // immediately; every later task starts 'not_started' (locked) until the
-  // task before it completes (see advanceNextTask).
+  // The very first task (lowest sort_order) starts 'in_progress' immediately
+  // unless it's clock-anchored and not open yet (see clockWindowFor), in which
+  // case it stays 'not_started' until the job's window opens. Every later
+  // task starts 'not_started' (locked) until the task before it completes
+  // (see advanceNextTask).
   const existingTaskIds = new Set((completions || []).map((c) => c.job_task_id));
   const missing = tasks.filter((t) => !existingTaskIds.has(t.id));
   const isFirstEverCreation = (completions || []).length === 0;
   if (missing.length > 0) {
     const newRows = missing.map((t) => {
       const isFirstTask = t.sort_order === tasks[0].sort_order;
-      const startsInProgress = isFirstEverCreation && isFirstTask;
+      const clockWindow = job ? clockWindowFor(t, job) : null;
+      const clockWindowOpen = clockWindow ? Date.now() >= clockWindow.opensAt.getTime() : true;
+      const startsInProgress = isFirstEverCreation && isFirstTask && clockWindowOpen;
       return {
         application_id: applicationId,
         job_task_id: t.id,
@@ -305,7 +410,10 @@ export async function getCompletions(req: AuthenticatedRequest, res: Response): 
   }
 
   const tasksById = new Map(tasks.map((t) => [t.id, t]));
-  await applyAutoFail(completions || [], tasksById);
+  if (job) {
+    await wakeClockAnchoredTasks(completions || [], tasks, job);
+    await applyAutoFail(completions || [], tasksById, job);
+  }
 
   const sorted = (completions || []).sort((a, b) => {
     const ta = tasksById.get(a.job_task_id)?.sort_order ?? 0;
@@ -313,8 +421,66 @@ export async function getCompletions(req: AuthenticatedRequest, res: Response): 
     return ta - tb;
   });
 
-  const mappedCompletions = await Promise.all(sorted.map(mapCompletion));
+  const mappedCompletions = await Promise.all(sorted.map((c) => {
+    const task = tasksById.get(c.job_task_id);
+    const clockWindow = job && task ? clockWindowFor(task, job, c) : null;
+    return mapCompletion(c, clockWindow);
+  }));
   res.json({ tasks: tasks.map(mapTask), completions: mappedCompletions });
+}
+
+/** Guards opening/closing task submissions against the job's clock window:
+ * rejects a submit attempt made before the task opens (e.g. trying to
+ * confirm arrival at 3:30 for a 4:00 PM job) or after its deadline has
+ * passed (applyAutoFail will have already flipped it to 'failed' by then,
+ * but this covers the race where the read and the submit interleave).
+ * Returns an error message to send back, or null if the submit may proceed. */
+async function checkClockWindowOpen(completion: Record<string, any>): Promise<string | null> {
+  const { data: task } = await supabase.from('job_tasks').select('*').eq('id', completion.job_task_id).single();
+  if (!task) return null;
+
+  const { data: application } = await supabase.from('applications').select('job_id').eq('id', completion.application_id).single();
+  if (!application) return null;
+
+  const { data: job } = await supabase.from('jobs').select('date, reporting_time, end_time').eq('id', application.job_id).single();
+  if (!job) return null;
+
+  const window = clockWindowFor(task, job, completion);
+  if (!window) return null;
+
+  const now = Date.now();
+  if (now < window.opensAt.getTime()) {
+    return `This task opens at ${window.opensAt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+  if (now > window.deadline.getTime()) {
+    return 'The window for this task has closed';
+  }
+  return null;
+}
+
+/** Auto-completes a worker's application the moment every one of their
+ * pipeline tasks is 'complete' — each worker finishes independently, at
+ * whatever pace they go through their own tasks. Only ever moves an
+ * application from 'confirmed'/'hired' to 'completed'; never touches an
+ * application that's already completed or in another terminal state. */
+async function checkAndCompleteApplication(applicationId: string) {
+  const { data: application } = await supabase.from('applications').select('status, job_id').eq('id', applicationId).single();
+  if (!application || application.status === 'completed') return;
+
+  const { data: tasks } = await supabase.from('job_tasks').select('id').eq('job_id', application.job_id);
+  if (!tasks || tasks.length === 0) return;
+
+  const { data: completions } = await supabase
+    .from('application_task_completions')
+    .select('job_task_id, status')
+    .eq('application_id', applicationId);
+  if (!completions) return;
+
+  const completionByTaskId = new Map(completions.map((c) => [c.job_task_id, c.status]));
+  const allComplete = tasks.every((t) => completionByTaskId.get(t.id) === 'complete');
+  if (!allComplete) return;
+
+  await supabase.from('applications').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', applicationId);
 }
 
 async function advanceNextTask(applicationId: string, completedTaskId: string) {
@@ -327,6 +493,14 @@ async function advanceNextTask(applicationId: string, completedTaskId: string) {
   const idx = tasks.findIndex((t) => t.id === completedTaskId);
   const next = idx >= 0 ? tasks[idx + 1] : undefined;
   if (!next) return;
+
+  // A clock-anchored next task (e.g. Closing Task tied to the job's end
+  // time) only unlocks once its window opens, even if all prior tasks
+  // finished early. wakeClockAnchoredTasks (called from getCompletions)
+  // flips it to in_progress later once the window opens.
+  const { data: job } = await supabase.from('jobs').select('date, reporting_time, end_time').eq('id', application.job_id).single();
+  const clockWindow = job ? clockWindowFor(next, job) : null;
+  if (clockWindow && Date.now() < clockWindow.opensAt.getTime()) return;
 
   await supabase
     .from('application_task_completions')
@@ -350,6 +524,12 @@ export async function tickCompletion(req: AuthenticatedRequest, res: Response): 
     return;
   }
 
+  const windowError = await checkClockWindowOpen(completion);
+  if (windowError) {
+    res.status(400).json({ error: windowError });
+    return;
+  }
+
   const { data: updated, error } = await supabase
     .from('application_task_completions')
     .update({ status: 'complete', submitted_at: new Date().toISOString(), reviewed_at: new Date().toISOString() })
@@ -363,6 +543,7 @@ export async function tickCompletion(req: AuthenticatedRequest, res: Response): 
   }
 
   await advanceNextTask(completion.application_id, completion.job_task_id);
+  await checkAndCompleteApplication(completion.application_id);
   res.json({ completion: await mapCompletion(updated) });
 }
 
@@ -386,6 +567,12 @@ export async function submitFormCompletion(req: AuthenticatedRequest, res: Respo
     return;
   }
 
+  const windowError = await checkClockWindowOpen(completion);
+  if (windowError) {
+    res.status(400).json({ error: windowError });
+    return;
+  }
+
   const { data: task } = await supabase.from('job_tasks').select('requires_review').eq('id', completion.job_task_id).single();
   const nextStatus = task?.requires_review ? 'submitted' : 'complete';
 
@@ -406,7 +593,10 @@ export async function submitFormCompletion(req: AuthenticatedRequest, res: Respo
     return;
   }
 
-  if (nextStatus === 'complete') await advanceNextTask(completion.application_id, completion.job_task_id);
+  if (nextStatus === 'complete') {
+    await advanceNextTask(completion.application_id, completion.job_task_id);
+    await checkAndCompleteApplication(completion.application_id);
+  }
   res.json({ completion: await mapCompletion(updated) });
 }
 
@@ -427,6 +617,12 @@ export async function submitImageCompletion(req: AuthenticatedRequest, res: Resp
   const access = await authorizeCompletionAccess(req, completion.application_id);
   if (!access.isWorker) {
     res.status(403).json({ error: 'Only the assigned worker can submit this task' });
+    return;
+  }
+
+  const windowError = await checkClockWindowOpen(completion);
+  if (windowError) {
+    res.status(400).json({ error: windowError });
     return;
   }
 
@@ -458,7 +654,10 @@ export async function submitImageCompletion(req: AuthenticatedRequest, res: Resp
     return;
   }
 
-  if (nextStatus === 'complete') await advanceNextTask(completion.application_id, completion.job_task_id);
+  if (nextStatus === 'complete') {
+    await advanceNextTask(completion.application_id, completion.job_task_id);
+    await checkAndCompleteApplication(completion.application_id);
+  }
   res.json({ completion: await mapCompletion(updated) });
 }
 
@@ -504,8 +703,98 @@ export async function reviewCompletion(req: AuthenticatedRequest, res: Response)
     return;
   }
 
-  if (approve) await advanceNextTask(completion.application_id, completion.job_task_id);
+  if (approve) {
+    await advanceNextTask(completion.application_id, completion.job_task_id);
+    await checkAndCompleteApplication(completion.application_id);
+  }
   res.json({ completion: await mapCompletion(updated) });
+}
+
+// POST /api/pipeline/completions/:completionId/employer-complete
+// Emergency override: employer force-completes a single task (e.g. worker's
+// phone died, missed the clock window) regardless of its current status or
+// the clock window. Only advances/checks the one task — does not touch
+// any other task in the pipeline.
+export async function employerForceComplete(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { completionId } = req.params;
+  const { data: completion } = await supabase.from('application_task_completions').select('*').eq('id', completionId).single();
+  if (!completion) {
+    res.status(404).json({ error: 'Task completion not found' });
+    return;
+  }
+  const access = await authorizeCompletionAccess(req, completion.application_id);
+  if (!access.isEmployer) {
+    res.status(403).json({ error: 'Only the employer can override this task' });
+    return;
+  }
+
+  const { data: updated, error } = await supabase
+    .from('application_task_completions')
+    .update({
+      status: 'complete',
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: req.user!.id,
+      rejection_reason: null,
+    })
+    .eq('id', completionId)
+    .select('*')
+    .single();
+
+  if (error || !updated) {
+    res.status(500).json({ error: error?.message || 'Failed to complete task' });
+    return;
+  }
+
+  await advanceNextTask(completion.application_id, completion.job_task_id);
+  await checkAndCompleteApplication(completion.application_id);
+  res.json({ completion: await mapCompletion(updated) });
+}
+
+// POST /api/pipeline/completions/:completionId/employer-reopen
+// Emergency override: employer reopens a failed (or otherwise stuck) task
+// for one worker, giving them a fresh window to submit — used when a clock
+// window closed for a reason outside the worker's control. Clock-anchored
+// tasks get a fresh window starting now, sized the same as their original
+// open_minutes_after; relative-timer tasks reuse their auto_fail_minutes.
+export async function employerReopenTask(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const { completionId } = req.params;
+  const { data: completion } = await supabase.from('application_task_completions').select('*').eq('id', completionId).single();
+  if (!completion) {
+    res.status(404).json({ error: 'Task completion not found' });
+    return;
+  }
+  const access = await authorizeCompletionAccess(req, completion.application_id);
+  if (!access.isEmployer) {
+    res.status(403).json({ error: 'Only the employer can reopen this task' });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const { data: updated, error } = await supabase
+    .from('application_task_completions')
+    .update({
+      status: 'in_progress',
+      available_at: now,
+      manually_reopened_at: now,
+      submitted_at: null,
+      reviewed_at: null,
+      rejection_reason: null,
+    })
+    .eq('id', completionId)
+    .select('*')
+    .single();
+
+  if (error || !updated) {
+    res.status(500).json({ error: error?.message || 'Failed to reopen task' });
+    return;
+  }
+
+  const { data: application } = await supabase.from('applications').select('job_id').eq('id', completion.application_id).single();
+  const { data: task } = await supabase.from('job_tasks').select('*').eq('id', completion.job_task_id).single();
+  const { data: job } = application ? await supabase.from('jobs').select('date, reporting_time, end_time').eq('id', application.job_id).single() : { data: null };
+  const clockWindow = job && task ? clockWindowFor(task, job, updated) : null;
+
+  res.json({ completion: await mapCompletion(updated, clockWindow) });
 }
 
 // GET /api/pipeline/completions/:completionId/image-url

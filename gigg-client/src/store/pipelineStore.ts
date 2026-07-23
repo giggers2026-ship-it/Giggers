@@ -14,6 +14,9 @@ function mapTask(t: any): JobTask {
     formSchema: t.formSchema,
     responseWindowMinutes: t.responseWindowMinutes,
     autoFailMinutes: t.autoFailMinutes,
+    openMinutesBefore: t.openMinutesBefore,
+    openMinutesAfter: t.openMinutesAfter,
+    anchorTime: t.anchorTime,
     requiresReview: t.requiresReview,
   };
 }
@@ -30,6 +33,8 @@ function mapCompletion(c: any): TaskCompletion {
     submittedAt: c.submittedAt,
     reviewedAt: c.reviewedAt,
     rejectionReason: c.rejectionReason,
+    opensAt: c.opensAt,
+    deadlineAt: c.deadlineAt,
   };
 }
 
@@ -40,6 +45,9 @@ export interface TaskDraft {
   completionType: 'image' | 'form' | 'tick';
   responseWindowMinutes: number;
   autoFailMinutes: number;
+  openMinutesBefore: number;
+  openMinutesAfter: number;
+  anchorTime?: string;
   requiresReview: boolean;
 }
 
@@ -55,6 +63,8 @@ interface PipelineState {
   submitForm: (completionId: string, formData: Record<string, string | number>) => Promise<void>;
   submitImage: (completionId: string, imageDataUrl: string) => Promise<void>;
   reviewCompletion: (completionId: string, approve: boolean, rejectionReason?: string) => Promise<void>;
+  employerCompleteTask: (completionId: string) => Promise<void>;
+  employerReopenTask: (completionId: string) => Promise<void>;
 }
 
 export const usePipelineStore = create<PipelineState>((set, get) => ({
@@ -110,6 +120,16 @@ export const usePipelineStore = create<PipelineState>((set, get) => ({
 
   reviewCompletion: async (completionId: string, approve: boolean, rejectionReason?: string) => {
     const res = await api.post<{ completion: any }>(`/api/pipeline/completions/${completionId}/review`, { approve, rejectionReason });
+    await get().refetchCompletionsSilently(res.completion.applicationId);
+  },
+
+  employerCompleteTask: async (completionId: string) => {
+    const res = await api.post<{ completion: any }>(`/api/pipeline/completions/${completionId}/employer-complete`);
+    await get().refetchCompletionsSilently(res.completion.applicationId);
+  },
+
+  employerReopenTask: async (completionId: string) => {
+    const res = await api.post<{ completion: any }>(`/api/pipeline/completions/${completionId}/employer-reopen`);
     await get().refetchCompletionsSilently(res.completion.applicationId);
   },
 }));

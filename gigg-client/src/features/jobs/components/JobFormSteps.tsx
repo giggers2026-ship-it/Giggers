@@ -1,6 +1,8 @@
 import React from 'react';
 import { Input, Select, Toggle, Textarea } from '../../../components/ui';
 import { Info, MapPin, Calculator } from 'lucide-react';
+import { JOB_CATEGORIES, parseDosAndDonts, formatDosAndDonts } from '../constants';
+import { LocationPicker } from './LocationPicker';
 
 export interface JobFormState {
   title: string;
@@ -54,17 +56,27 @@ interface JobFormStepsProps {
   setters: JobFormSetters;
 }
 
+const CATEGORY_HINTS: Record<string, string> = {
+  'Catering': 'e.g. Wedding servers, buffet waitstaff, banquet crew',
+  'Pamphlet Dist.': 'e.g. Flyer team, area distributors, ground deployment',
+  'Survey': 'e.g. Door-to-door surveyors, feedback collection',
+  'Event Staff': 'e.g. Ushers, crowd management, registration desk',
+  'Promotion': 'e.g. Brand ambassadors, product sampling, roadshows',
+  'Delivery': 'e.g. Last-mile delivery, courier runs',
+  'Data Entry': 'e.g. Form digitization, spreadsheet entry',
+};
+
+const CATEGORY_DRESS_CODE: Record<string, string> = {
+  'Catering': 'Formal (White shirt, Black trousers)',
+  'Pamphlet Dist.': 'Casual',
+};
+
 export function JobFormSteps({ step, state, setters }: JobFormStepsProps) {
-  const categoryHint = state.category === 'Catering'
-    ? 'e.g. Wedding servers, buffet waitstaff, banquet crew'
-    : state.category === 'Pamphlet Dist.'
-    ? 'e.g. Flyer team, area distributors, ground deployment'
-    : '';
+  const categoryHint = CATEGORY_HINTS[state.category] || '';
 
   const handleCategoryChange = (val: string) => {
     setters.setCategory(val);
-    if (val === 'Catering') setters.setDressCode('Formal (White shirt, Black trousers)');
-    if (val === 'Pamphlet Dist.') setters.setDressCode('Casual');
+    if (CATEGORY_DRESS_CODE[val]) setters.setDressCode(CATEGORY_DRESS_CODE[val]);
   };
 
   const totalCost = state.workersNeeded * (Number(state.payPerWorker) || 0);
@@ -81,26 +93,15 @@ export function JobFormSteps({ step, state, setters }: JobFormStepsProps) {
           <Input label="Client ID" placeholder="e.g. CLI-9021" value={state.clientId} onChange={e => setters.setClientId(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Category *</label>
-          <div className="grid grid-cols-2 gap-2">
-            {['Catering', 'Pamphlet Dist.'].map(cat => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => handleCategoryChange(cat)}
-                className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 font-bold text-sm transition-all ${
-                  state.category === cat
-                    ? cat === 'Catering'
-                      ? 'bg-amber-50 border-amber-400 text-amber-800 dark:bg-amber-900/20 dark:border-amber-500 dark:text-amber-300'
-                      : 'bg-emerald-50 border-emerald-500 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-500 dark:text-emerald-300'
-                    : 'border-slate-200 dark:border-dark-500 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                }`}
-              >
-                <span className="text-lg">{cat === 'Catering' ? '👨‍🍳' : '📄'}</span>
-                {cat}
-              </button>
-            ))}
-          </div>
+          <Select
+            label="Category *"
+            value={state.category}
+            onChange={e => handleCategoryChange(e.target.value)}
+            options={[
+              { value: '', label: 'Select a category' },
+              ...JOB_CATEGORIES.map(c => ({ value: c.value, label: `${c.icon} ${c.label}` })),
+            ]}
+          />
           {categoryHint && (
             <p className="text-xs text-slate-500 dark:text-slate-400 font-medium pl-1">{categoryHint}</p>
           )}
@@ -141,7 +142,7 @@ export function JobFormSteps({ step, state, setters }: JobFormStepsProps) {
           <Input label="End Time" type="time" value={state.endTime} onChange={e => setters.setEndTime(e.target.value)} />
         </div>
         <Input label="City/Area *" placeholder="e.g. Bandra West, Mumbai" value={state.location} onChange={e => setters.setLocation(e.target.value)} leftIcon={<MapPin size={16} />} />
-        <Textarea label="Complete Address" placeholder="Full venue address" rows={3} value={state.address} onChange={e => setters.setAddress(e.target.value)} />
+        <LocationPicker value={state.address} onChange={setters.setAddress} />
         <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-dark-600 mt-2">
           <Toggle checked={state.needLocationBasedWorkers} onChange={setters.setNeedLocationBasedWorkers} label="Need Location based workers?" />
         </div>
@@ -152,7 +153,15 @@ export function JobFormSteps({ step, state, setters }: JobFormStepsProps) {
   return (
     <>
       <Textarea label="Job Description *" placeholder="Detail what the workers need to do..." rows={5} value={state.description} onChange={e => setters.setDescription(e.target.value)} />
-      <Textarea label="Do's & Don'ts" placeholder="e.g. Do arrive 15 mins early. Don't use phones during service." rows={3} value={state.dosAndDonts} onChange={e => setters.setDosAndDonts(e.target.value)} />
+      {(() => {
+        const { dos, donts } = parseDosAndDonts(state.dosAndDonts);
+        return (
+          <>
+            <Textarea label="Do's" placeholder="e.g. Arrive 15 mins early. Wear the provided uniform." rows={3} value={dos} onChange={e => setters.setDosAndDonts(formatDosAndDonts(e.target.value, donts))} />
+            <Textarea label="Don'ts" placeholder="e.g. Don't use phones during service. Don't leave the venue without checkout." rows={3} value={donts} onChange={e => setters.setDosAndDonts(formatDosAndDonts(dos, e.target.value))} />
+          </>
+        );
+      })()}
       <Select label="Mode of Payment" value={state.modeOfPayment} onChange={e => setters.setModeOfPayment(e.target.value)} options={[
         { value: 'Online', label: 'Online' },
         { value: 'Cash', label: 'Cash' },

@@ -10,6 +10,8 @@ import {
   submitFormCompletion,
   submitImageCompletion,
   reviewCompletion,
+  employerForceComplete,
+  employerReopenTask,
   getCompletionImageUrl,
 } from '../controllers/pipeline.controller';
 
@@ -27,6 +29,8 @@ router.post('/completions/:completionId/tick', tickCompletion);
 router.post('/completions/:completionId/form', submitFormCompletion);
 router.post('/completions/:completionId/image', submitImageCompletion);
 router.post('/completions/:completionId/review', reviewCompletion);
+router.post('/completions/:completionId/employer-complete', employerForceComplete);
+router.post('/completions/:completionId/employer-reopen', employerReopenTask);
 router.get('/completions/:completionId/image-url', getCompletionImageUrl);
 
 export default router;

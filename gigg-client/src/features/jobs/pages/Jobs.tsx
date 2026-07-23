@@ -8,6 +8,7 @@ import { Button, Input, Modal, Chip, Skeleton, Toggle, Badge } from '../../../co
 import { useJobStore } from '../../../store/jobStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useUIStore } from '../../../store/uiStore';
+import { JOB_CATEGORIES } from '../constants';
 
 export default function Jobs() {
   const navigate = useNavigate();
@@ -160,8 +161,9 @@ export default function Jobs() {
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <Chip active={activeCategory === 'All'} onClick={() => setActiveCategory('All')}>All</Chip>
                 <Chip active={urgentOnly} onClick={() => setUrgentOnly(!urgentOnly)}>🚨 Urgent</Chip>
-                <Chip active={activeCategory === 'Catering'} onClick={() => setActiveCategory('Catering')}>👨‍🍳 Catering</Chip>
-                <Chip active={activeCategory === 'Pamphlet Dist.'} onClick={() => setActiveCategory('Pamphlet Dist.')}>📄 Pamphlet Dist.</Chip>
+                {JOB_CATEGORIES.map(cat => (
+                  <Chip key={cat.value} active={activeCategory === cat.value} onClick={() => setActiveCategory(cat.value)}>{cat.icon} {cat.label}</Chip>
+                ))}
               </div>
 
               {isLoading ? (

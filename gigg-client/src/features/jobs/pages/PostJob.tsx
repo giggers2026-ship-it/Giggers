@@ -10,6 +10,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { Calculator, Wallet, Shield, ShieldAlert } from 'lucide-react';
 import { Modal } from '../../../components/ui';
 import { JobFormSteps, type JobFormState, type JobFormSetters } from '../components/JobFormSteps';
+import { parseDosAndDonts } from '../constants';
 
 const STEP_TITLES: Record<number, string> = {
   1: 'Job Details',
@@ -32,7 +33,6 @@ const REVIEW_FIELDS: { label: string; key: keyof JobFormState }[] = [
   { label: 'Location', key: 'location' },
   { label: 'Address', key: 'address' },
   { label: 'Description', key: 'description' },
-  { label: "Do's & Don'ts", key: 'dosAndDonts' },
   { label: 'Mode of Payment', key: 'modeOfPayment' },
   { label: 'Payment Date', key: 'paymentDate' },
   { label: 'Dress Code', key: 'dressCode' },
@@ -218,6 +218,25 @@ export default function PostJob() {
                       </div>
                     );
                   })}
+                  {(() => {
+                    const { dos, donts } = parseDosAndDonts(formState.dosAndDonts);
+                    return (
+                      <>
+                        {dos && (
+                          <div className="bg-slate-50 dark:bg-dark-700 p-3 rounded-xl flex justify-between items-start gap-3">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">Do's</span>
+                            <span className="text-xs font-semibold text-slate-900 dark:text-white text-right whitespace-pre-wrap">{dos}</span>
+                          </div>
+                        )}
+                        {donts && (
+                          <div className="bg-slate-50 dark:bg-dark-700 p-3 rounded-xl flex justify-between items-start gap-3">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">Don'ts</span>
+                            <span className="text-xs font-semibold text-slate-900 dark:text-white text-right whitespace-pre-wrap">{donts}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </>
             )}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 import { motion } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 
 // ============================================================
 // BUTTON
@@ -112,9 +113,12 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 export const Select: React.FC<SelectProps> = ({ label, options, className, ...props }) => (
   <div className="w-full">
     {label && <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 ml-1">{label}</label>}
-    <select className={clsx('input-field appearance-none', className)} {...props}>
-      {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-    </select>
+    <div className="relative">
+      <select className={clsx('input-field appearance-none pr-9', className)} {...props}>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
+    </div>
   </div>
 );
 
