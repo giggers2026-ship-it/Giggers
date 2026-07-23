@@ -106,11 +106,9 @@ export default function Landing() {
                                     <h3>Catering Staff</h3>
                                     <p>Matched in 4 mins</p>
                                 </div>
-                                <img src="/assets/caterer_hero.png" alt="White Shirt Caterer" className="flex-graphic caterer-bob" />
                             </div>
 
                             <div className="flex-visual-block flyers-block">
-                                <img src="/assets/pamphlets_hero.png" alt="Flying Pamphlets" className="flex-graphic pamphlets-bob" />
                                 <div className="visual-card">
                                     <div className="visual-icon blue">
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
