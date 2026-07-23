@@ -150,14 +150,19 @@ export async function verifyOtpHandler(req: Request, res: Response): Promise<voi
     }
   }
 
+  // Both branches above guarantee profile is set by this point: the `if
+  // (!profile)` branch either returns early or assigns newProfile, and the
+  // `else` branch only runs when profile was already truthy.
+  const finalProfile = profile!;
+
   const token = signToken({
-    id: profile.id,
+    id: finalProfile.id,
     phone,
-    role: profile.role,
-    name: profile.name,
+    role: finalProfile.role,
+    name: finalProfile.name,
   });
 
-  res.json({ token, user: serializeProfile(profile) });
+  res.json({ token, user: serializeProfile(finalProfile) });
 }
 
 export async function meHandler(req: AuthenticatedRequest, res: Response): Promise<void> {
