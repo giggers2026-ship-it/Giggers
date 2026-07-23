@@ -174,7 +174,7 @@ export const WorkerCard: React.FC<WorkerCardProps> = ({ worker, onClick, onHire,
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">{worker.name}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{worker.categories.join(', ')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">{(worker.categories || []).join(', ')}</p>
             </div>
             <div className="text-right">
               <Rating value={worker.rating} />
@@ -188,7 +188,7 @@ export const WorkerCard: React.FC<WorkerCardProps> = ({ worker, onClick, onHire,
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <Badge variant={worker.isVerified ? 'success' : 'gray'} dot>{worker.isVerified ? 'Verified' : 'Unverified'}</Badge>
             {worker.availableToday && <Badge variant="primary" dot>Available Today</Badge>}
-            {worker.categories.slice(0, 2).map(c => (
+            {(worker.categories || []).slice(0, 2).map(c => (
               <span key={c} className="text-[10px] font-bold bg-slate-100 dark:bg-dark-500 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded-full">{c}</span>
             ))}
           </div>

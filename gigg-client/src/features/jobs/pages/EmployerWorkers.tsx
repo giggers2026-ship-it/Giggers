@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../../../components/layout/Navigation';
-import { Avatar, Button, Chip } from '../../../components/ui';
+import { Avatar, Button, Badge } from '../../../components/ui';
 import { useAuthStore } from '../../../store/authStore';
 import { supabase } from '../../../lib/supabase';
 import type { Application } from '../../../types';
@@ -97,9 +97,9 @@ export default function EmployerWorkers() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <h4 className="font-bold text-slate-900 dark:text-white truncate pr-2">{application.workerName}</h4>
-                    <Chip variant={application.status === 'completed' ? 'success' : 'primary'} size="sm">
+                    <Badge variant={application.status === 'completed' ? 'success' : 'primary'}>
                       {application.status}
-                    </Chip>
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-2">
                     <span className="flex items-center text-amber-500 font-bold"><Star size={12} className="mr-0.5 fill-current" /> {application.workerRating || 4.5}</span>
