@@ -9,13 +9,16 @@ import paymentRoutes from './routes/payment.routes';
 import trackingRoutes from './routes/tracking.routes';
 import mapsRoutes from './routes/maps.routes';
 import kycRoutes from './routes/kyc.routes';
+import pipelineRoutes from './routes/pipeline.routes';
+import clientsRoutes from './routes/clients.routes';
+import recordingsRoutes from './routes/recordings.routes';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 4000;
 
 app.use(helmet());
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:6173').split(',');
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -47,6 +50,9 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/tracking', trackingRoutes);
 app.use('/api/maps', mapsRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/pipeline', pipelineRoutes);
+app.use('/api/clients', clientsRoutes);
+app.use('/api/recordings', recordingsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });

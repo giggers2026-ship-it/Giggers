@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Search, Filter, Briefcase, FileText, Activity, Compass, MessageCircle, ShieldAlert } from 'lucide-react';
+import { Search, Filter, Briefcase, FileText, Activity, Compass, MessageCircle, ShieldAlert, MapPin, Check, X as XIcon } from 'lucide-react';
 import { AppHeader } from '../../../components/layout/Navigation';
 import { JobCard } from '../../../components/shared/Cards';
-import { Button, Input, Modal, Chip, Skeleton, Toggle } from '../../../components/ui';
+import { Button, Input, Modal, Chip, Skeleton, Toggle, Badge } from '../../../components/ui';
 import { useJobStore } from '../../../store/jobStore';
 import { useAuthStore } from '../../../store/authStore';
+import { useUIStore } from '../../../store/uiStore';
+import { JOB_CATEGORIES } from '../constants';
 
 export default function Jobs() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { user } = useAuthStore();
-  const { jobs, myJobs, applications, fetchJobs, fetchPostedJobs, fetchAppliedJobs, fetchChatThreadId, isLoading, savedJobIds, saveJob, unsaveJob } = useJobStore();
+  const { jobs, myJobs, applications, fetchJobs, fetchPostedJobs, fetchAppliedJobs, fetchChatThreadId, isLoading, savedJobIds, saveJob, unsaveJob, confirmHire, declineHire } = useJobStore();
+  const { addToast } = useUIStore();
+  const [actioningId, setActioningId] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<'explore' | 'postings' | 'applications' | 'ongoing'>(() => {
     const tabParam = params.get('tab');
@@ -30,6 +34,8 @@ export default function Jobs() {
   const [activeCategory, setActiveCategory] = useState(params.get('category') || 'All');
   const [activeSort, setActiveSort] = useState('recent');
   const [urgentOnly, setUrgentOnly] = useState(params.get('filter') === 'urgent');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [genderFilter, setGenderFilter] = useState<'any' | 'male' | 'female'>('any');
 
   // Enforce role-based tab access
   useEffect(() => {
@@ -61,13 +67,18 @@ export default function Jobs() {
     
     if (activeCategory !== 'All' && j.category !== activeCategory) return false;
     if (urgentOnly && !j.isUrgent) return false;
+    if (locationFilter && !j.location.toLowerCase().includes(locationFilter.toLowerCase())) return false;
+    if (genderFilter !== 'any' && j.genderPreference !== 'any' && j.genderPreference !== genderFilter) return false;
     if (search && !j.title.toLowerCase().includes(search.toLowerCase()) && !j.employerName.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
+  const pendingConfirmation = applications.filter(a => a.status === 'hired');
+  const confirmedOngoing = applications.filter(a => a.status === 'confirmed');
+
   const ongoingJobs = [
     ...myJobs.filter(j => j.status === 'active'),
-    ...applications.filter(a => a.status === 'accepted').map(a => a.job)
+    ...confirmedOngoing.map(a => a.job)
   ];
 
   const visibleTabs = user?.role === 'employer'
@@ -144,14 +155,15 @@ export default function Jobs() {
                   className="w-11 h-11 bg-slate-100 dark:bg-dark-600 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-300 relative flex-shrink-0"
                 >
                   <Filter size={18} />
-                  {(activeCategory !== 'All' || urgentOnly) && <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-white dark:border-dark-600" />}
+                  {(activeCategory !== 'All' || urgentOnly || locationFilter || genderFilter !== 'any') && <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-primary-500 rounded-full border-2 border-white dark:border-dark-600" />}
                 </button>
               </div>
               <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                 <Chip active={activeCategory === 'All'} onClick={() => setActiveCategory('All')}>All</Chip>
                 <Chip active={urgentOnly} onClick={() => setUrgentOnly(!urgentOnly)}>🚨 Urgent</Chip>
-                <Chip active={activeCategory === 'Catering'} onClick={() => setActiveCategory('Catering')}>👨‍🍳 Catering</Chip>
-                <Chip active={activeCategory === 'Pamphlet Dist.'} onClick={() => setActiveCategory('Pamphlet Dist.')}>📄 Pamphlet Dist.</Chip>
+                {JOB_CATEGORIES.map(cat => (
+                  <Chip key={cat.value} active={activeCategory === cat.value} onClick={() => setActiveCategory(cat.value)}>{cat.icon} {cat.label}</Chip>
+                ))}
               </div>
 
               {isLoading ? (
@@ -211,19 +223,20 @@ export default function Jobs() {
                           <p className="text-xs text-slate-500 mt-1">{app.job.employerName}</p>
                         </div>
                         <div className={`px-2.5 py-1 text-[10px] font-black uppercase rounded-lg ${
-                          app.status === 'hired' ? 'bg-emerald-100 text-emerald-700' :
+                          app.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
+                          app.status === 'hired' ? 'bg-blue-100 text-blue-700' :
                           app.status === 'rejected' ? 'bg-red-100 text-red-700' :
                           app.status === 'completed' ? 'bg-blue-100 text-blue-700' :
                           'bg-amber-100 text-amber-700'
                         }`}>
-                          {app.status}
+                          {app.status === 'hired' ? 'Action Required' : app.status}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-dark-700 p-2.5 rounded-xl mb-3">
                         <span>{app.job.date}</span>
                         <span className="font-black text-slate-900 dark:text-white">₹{app.job.payPerWorker}</span>
                       </div>
-                      {app.status === 'hired' && user && (
+                      {app.status === 'confirmed' && user && (
                         <div className="flex gap-2">
                           <button
                             onClick={() => navigate(`/worker-pipeline/${app.jobId}`)}
@@ -263,12 +276,79 @@ export default function Jobs() {
             <motion.div key="ongoing" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col gap-4">
               {isLoading ? (
                 <p className="text-slate-500 text-center py-8">Loading ongoing jobs...</p>
-              ) : ongoingJobs.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {ongoingJobs.map((job) => (
-                    <JobCard key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />
-                  ))}
-                </div>
+              ) : (ongoingJobs.length > 0 || pendingConfirmation.length > 0) ? (
+                <>
+                  {user?.role !== 'employer' && pendingConfirmation.length > 0 && (
+                    <div className="flex flex-col gap-3 mb-2">
+                      <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">Awaiting Your Confirmation</h4>
+                      {pendingConfirmation.map((app) => (
+                        <div key={app.id} className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-blue-200 dark:border-blue-800/40">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h4 className="font-bold text-slate-900 dark:text-white">{app.job.title}</h4>
+                              <p className="text-xs text-slate-500 mt-1">{app.job.employerName}</p>
+                            </div>
+                            <Badge variant="primary">Action Required</Badge>
+                          </div>
+                          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-dark-700 p-2.5 rounded-xl mb-3">
+                            <span>{app.job.date}</span>
+                            <span>{app.job.reportingTime}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              fullWidth
+                              loading={actioningId === app.id}
+                              leftIcon={<Check size={16} />}
+                              onClick={async () => {
+                                setActioningId(app.id);
+                                try {
+                                  await confirmHire(app.id);
+                                  addToast('Job confirmed!', 'success');
+                                } catch {
+                                  addToast('Failed to confirm', 'error');
+                                } finally {
+                                  setActioningId(null);
+                                }
+                              }}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              fullWidth
+                              className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800/40 dark:hover:bg-red-900/20"
+                              loading={actioningId === app.id}
+                              leftIcon={<XIcon size={16} />}
+                              onClick={async () => {
+                                setActioningId(app.id);
+                                try {
+                                  await declineHire(app.id);
+                                  addToast('Offer declined', 'info');
+                                } catch {
+                                  addToast('Failed to decline', 'error');
+                                } finally {
+                                  setActioningId(null);
+                                }
+                              }}
+                            >
+                              Reject
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {ongoingJobs.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {ongoingJobs.map((job) => (
+                        <JobCard key={job.id} job={job} onClick={() => navigate(`/jobs/${job.id}`)} />
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-16 bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-dark-600 shadow-sm">
                   <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -307,12 +387,31 @@ export default function Jobs() {
             </div>
           </div>
           <div className="h-px bg-slate-100 dark:bg-dark-500" />
+          <div>
+            <p className="text-sm font-bold text-slate-800 dark:text-white mb-3">Location</p>
+            <Input placeholder="e.g. Andheri West" value={locationFilter} onChange={(e) => setLocationFilter(e.target.value)} leftIcon={<MapPin size={16} />} />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-slate-800 dark:text-white mb-3">Gender Preference</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(['any', 'male', 'female'] as const).map(g => (
+                <button
+                  key={g}
+                  onClick={() => setGenderFilter(g)}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-bold border transition-all capitalize ${genderFilter === g ? 'bg-primary-50 dark:bg-primary-900/30 border-primary-500 text-primary-600' : 'border-slate-200 dark:border-dark-500 text-slate-600 dark:text-slate-400'}`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="h-px bg-slate-100 dark:bg-dark-500" />
           <div className="flex flex-col gap-4">
             <Toggle checked={urgentOnly} onChange={setUrgentOnly} label="Urgent Requirements Only" />
             <Toggle checked={false} onChange={() => {}} label="Verified Employers Only" />
           </div>
           <div className="flex gap-3 mt-4">
-            <Button variant="outline" fullWidth onClick={() => { setActiveCategory('All'); setUrgentOnly(false); setActiveSort('recent'); }}>Reset</Button>
+            <Button variant="outline" fullWidth onClick={() => { setActiveCategory('All'); setUrgentOnly(false); setActiveSort('recent'); setLocationFilter(''); setGenderFilter('any'); }}>Reset</Button>
             <Button fullWidth onClick={() => setShowFilters(false)}>Apply Filters</Button>
           </div>
         </div>

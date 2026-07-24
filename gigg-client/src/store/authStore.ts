@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 import { api } from '../lib/api';
@@ -9,9 +9,18 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** True once the persisted session has been read back from sessionStorage.
+   * Route guards (see AppShell) must wait for this before treating
+   * isAuthenticated as authoritative — persist rehydration happens
+   * asynchronously after the store's initial (unauthenticated) state, so
+   * checking isAuthenticated too early on a fresh page load/refresh always
+   * reads false and incorrectly bounces a logged-in user to /welcome. */
+  hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   sendOtp: (phone: string) => Promise<void>;
   verifyOtp: (phone: string, otp: string, role?: 'worker' | 'employer') => Promise<boolean>;
   register: (data: Partial<UserProfile> & { role: 'worker' | 'employer'; otp: string }) => Promise<void>;
+  redeemClientInvite: (inviteToken: string) => Promise<string>;
   refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: UserProfile) => void;
@@ -24,7 +33,7 @@ function mapApiUser(u: Record<string, unknown>): UserProfile {
     name: (u.name as string) || '',
     email: (u.email as string) || '',
     phone: (u.phone as string) || '',
-    role: ((u.role as 'worker' | 'employer' | 'admin') || 'worker') === 'admin' ? 'worker' : (u.role as 'worker' | 'employer') || 'worker',
+    role: ((u.role as 'worker' | 'employer' | 'admin' | 'client') || 'worker') === 'admin' ? 'worker' : (u.role as 'worker' | 'employer' | 'client') || 'worker',
     avatar: u.avatar as string | undefined,
     selfie: (u.selfie as string | undefined) ?? (u.selfie_url as string | undefined),
     isVerified: Boolean(u.isVerified ?? u.is_verified),
@@ -58,6 +67,10 @@ function mapApiUser(u: Record<string, unknown>): UserProfile {
     categories: u.categories as string[] | undefined,
     gender: u.gender as 'male' | 'female' | 'other' | undefined,
     age: u.age as number | undefined,
+    creditPoint: Number(u.creditPoint ?? u.credit_point) || 0,
+    oneLiner: (u.oneLiner as string | undefined) ?? (u.one_liner as string | undefined),
+    upiId: (u.upiId as string | undefined) ?? (u.upi_id as string | undefined),
+    bankAccount: (u.bankAccount as string | undefined) ?? (u.bank_account as string | undefined),
   };
 }
 
@@ -68,6 +81,8 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       isAuthenticated: false,
       isLoading: false,
+      hasHydrated: false,
+      setHasHydrated: (v) => set({ hasHydrated: v }),
       sendOtp: async (phone: string) => {
         set({ isLoading: true });
         try {
@@ -107,6 +122,17 @@ export const useAuthStore = create<AuthState>()(
           throw err;
         }
       },
+      redeemClientInvite: async (inviteToken: string) => {
+        set({ isLoading: true });
+        try {
+          const res = await api.post<{ token: string; user: Record<string, unknown>; jobId: string }>('/api/clients/redeem', { inviteToken });
+          set({ token: res.token, user: mapApiUser(res.user), isAuthenticated: true, isLoading: false });
+          return res.jobId;
+        } catch (err: any) {
+          set({ isLoading: false });
+          throw err;
+        }
+      },
       refreshUser: async () => {
         const { token, isAuthenticated } = get();
         if (!token || !isAuthenticated) return;
@@ -137,6 +163,9 @@ export const useAuthStore = create<AuthState>()(
         if (updates.age !== undefined) dbUpdates.age = updates.age;
         if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
         if (updates.companyName !== undefined) dbUpdates.company_name = updates.companyName;
+        if (updates.oneLiner !== undefined) dbUpdates.one_liner = updates.oneLiner;
+        if (updates.upiId !== undefined) dbUpdates.upi_id = updates.upiId;
+        if (updates.bankAccount !== undefined) dbUpdates.bank_account = updates.bankAccount;
         const { data: updated, error } = await supabase.from('profiles').update(dbUpdates).eq('id', user.id).select().single();
         if (!error && updated) {
           set({ user: mapApiUser(updated as Record<string, unknown>) });
@@ -144,6 +173,18 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: false });
       },
     }),
-    { name: 'giggers-auth', partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }) }
+    {
+      name: 'giggers-auth',
+      // sessionStorage, not localStorage: each browser tab gets its own
+      // independent session. localStorage is shared across every tab of
+      // the browser, so logging in as employer in one tab and worker in
+      // another overwrites the same key — a refresh in either tab then
+      // re-reads whichever login happened last, silently switching roles.
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
   )
 );

@@ -7,7 +7,7 @@ export interface AuthenticatedRequest extends Request {
 export interface JwtPayload {
   id: string;
   phone: string;
-  role: 'worker' | 'employer';
+  role: 'worker' | 'employer' | 'client';
   name: string;
 }
 

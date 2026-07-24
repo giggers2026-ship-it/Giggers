@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ChatThread, ChatMessage } from '../types';
 import { supabase } from '../lib/supabase';
+import { api } from '../lib/api';
 
 interface ChatState {
   threads: ChatThread[];
@@ -12,6 +13,7 @@ interface ChatState {
   sendMessage: (threadId: string, senderId: string, text: string) => Promise<void>;
   subscribeToThread: (threadId: string) => () => void;
   markThreadRead: (threadId: string) => void;
+  appendMessage: (message: ChatMessage) => void;
 }
 
 function mapThread(row: Record<string, unknown>, currentUserId: string): ChatThread {
@@ -44,6 +46,8 @@ function mapMessage(row: Record<string, unknown>): ChatMessage {
     type: (row.type as ChatMessage['type']) || 'text',
     sentAt: row.sent_at as string,
     isRead: Boolean(row.is_read),
+    duration: row.video_duration_seconds as number | undefined,
+    jobTaskId: row.job_task_id as string | undefined,
   };
 }
 
@@ -90,7 +94,21 @@ export const useChatStore = create<ChatState>((set, get) => ({
       .order('sent_at', { ascending: true });
 
     if (!error && data) {
-      set({ messages: data.map((row) => mapMessage(row as unknown as Record<string, unknown>)) });
+      const messages = await Promise.all(
+        data.map(async (row) => {
+          const msg = mapMessage(row as unknown as Record<string, unknown>);
+          if (msg.type === 'video') {
+            try {
+              const res = await api.get<{ videoUrl?: string }>(`/api/recordings/${msg.id}/url`);
+              msg.videoUrl = res.videoUrl;
+            } catch {
+              // leave videoUrl undefined; UI shows a fallback state
+            }
+          }
+          return msg;
+        })
+      );
+      set({ messages });
     }
     set({ isLoading: false });
   },
@@ -132,12 +150,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
           table: 'chat_messages',
           filter: `thread_id=eq.${threadId}`,
         },
-        (payload) => {
+        async (payload) => {
           const msg = mapMessage(payload.new as Record<string, unknown>);
           const { messages, activeThread } = get();
           // Only append if not already present (avoid double-render from our own optimistic sends)
           if (activeThread?.id === threadId && !messages.find((m) => m.id === msg.id)) {
-            set({ messages: [...messages, msg] });
+            if (msg.type === 'video') {
+              try {
+                const res = await api.get<{ videoUrl?: string }>(`/api/recordings/${msg.id}/url`);
+                msg.videoUrl = res.videoUrl;
+              } catch {
+                // leave videoUrl undefined
+              }
+            }
+            set({ messages: [...get().messages, msg] });
           }
         }
       )
@@ -152,5 +178,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((s) => ({
       threads: s.threads.map((t) => (t.id === threadId ? { ...t, unreadCount: 0 } : t)),
     }));
+  },
+
+  appendMessage: (message: ChatMessage) => {
+    set((s) => (s.messages.find((m) => m.id === message.id) ? s : { messages: [...s.messages, message] }));
   },
 }));

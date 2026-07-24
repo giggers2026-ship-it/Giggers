@@ -59,6 +59,10 @@ function serializeProfile(profile: Record<string, any>) {
     kycSubmittedAt: profile.kyc_submitted_at || undefined,
     kycReviewedAt: profile.kyc_reviewed_at || undefined,
     kycRejectionReason: profile.kyc_rejection_reason || undefined,
+    creditPoint: profile.credit_point ?? 100,
+    oneLiner: profile.one_liner || undefined,
+    upiId: profile.upi_id || undefined,
+    bankAccount: profile.bank_account || undefined,
   };
 }
 
@@ -114,10 +118,6 @@ export async function submitKycHandler(req: AuthenticatedRequest, res: Response)
     pan_front_url: panFront,
     pan_back_url: panBack,
     selfie_url: selfie,
-    aadhaar_verified: false,
-    selfie_verified: false,
-    is_verified: false,
-    is_approved: false,
     kyc_status: 'submitted',
     kyc_submitted_at: submittedAt,
     kyc_reviewed_at: null,
@@ -134,13 +134,14 @@ export async function submitKycHandler(req: AuthenticatedRequest, res: Response)
     .eq('id', userId);
 
   if (updateProfileError) {
+    console.error('[KYC] profile update error:', updateProfileError);
     res.status(500).json({ error: updateProfileError.message });
     return;
   }
 
   const kycPayload = {
     user_id: userId,
-    type: 'identity',
+    type: 'other',
     status: 'pending',
     full_name: name,
     city,
@@ -171,6 +172,7 @@ export async function submitKycHandler(req: AuthenticatedRequest, res: Response)
   const { error: kycError } = await kycQuery;
 
   if (kycError) {
+    console.error('[KYC] kyc_documents error:', kycError);
     res.status(500).json({ error: kycError.message });
     return;
   }

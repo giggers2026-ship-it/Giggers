@@ -8,6 +8,7 @@ import type { Application } from '../../../types';
 import { useAuthStore } from '../../../store/authStore';
 import { useWalletStore } from '../../../store/walletStore';
 import { useUIStore } from '../../../store/uiStore';
+import { parseDosAndDonts } from '../constants';
 
 export default function JobDetails() {
   const { id } = useParams();
@@ -31,7 +32,8 @@ export default function JobDetails() {
     ? applications.find((a) => a.jobId === job.id)
     : undefined;
   const hasApplied = jobApplication !== undefined;
-  const isHired = jobApplication?.status === 'hired';
+  const isConfirmed = jobApplication?.status === 'confirmed';
+  const isPendingConfirmation = jobApplication?.status === 'hired';
 
   const handleApply = async () => {
     if (!user) return;
@@ -71,7 +73,7 @@ export default function JobDetails() {
               </button>
             ) : null
           ) : (
-            <button onClick={() => {}} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary-500">
+            <button onClick={() => navigate(`/edit-job/${job.id}`)} className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary-500">
               <Edit size={22} />
             </button>
           )
@@ -121,17 +123,23 @@ export default function JobDetails() {
             <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-dark-600 flex items-center justify-center text-slate-500 flex-shrink-0"><MapPin size={18} /></div>
             <div>
               <p className="text-sm font-bold text-slate-900 dark:text-white">{job.location}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1 leading-relaxed pr-4">{job.address}</p>
             </div>
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl overflow-hidden border border-slate-100 dark:border-dark-600">
-          <MapPlaceholder height="h-32" />
-          <div className="bg-slate-50 dark:bg-dark-700 p-3 text-center border-t border-slate-100 dark:border-dark-600">
-            <button className="text-xs font-bold text-primary-600 dark:text-primary-400">Open in Maps →</button>
+        {job.address && (
+          <div className="mt-6 rounded-2xl overflow-hidden border border-slate-100 dark:border-dark-600">
+            <MapPlaceholder height="h-32" />
+            <a
+              href={job.address}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block bg-slate-50 dark:bg-dark-700 p-3 text-center border-t border-slate-100 dark:border-dark-600 text-xs font-bold text-primary-600 dark:text-primary-400"
+            >
+              Open in Maps →
+            </a>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="px-5 py-6 bg-white dark:bg-dark-800 shadow-sm mb-2">
@@ -165,14 +173,25 @@ export default function JobDetails() {
           </div>
         </div>
         
-        {job.dosAndDonts && (
-          <div className="mt-4">
-            <p className="text-xs text-slate-500 font-bold mb-1">Do's & Don'ts</p>
-            <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">
-              {job.dosAndDonts}
-            </p>
-          </div>
-        )}
+        {job.dosAndDonts && (() => {
+          const { dos, donts } = parseDosAndDonts(job.dosAndDonts);
+          return (
+            <>
+              {dos && (
+                <div className="mt-4">
+                  <p className="text-xs text-slate-500 font-bold mb-1">Do's</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{dos}</p>
+                </div>
+              )}
+              {donts && (
+                <div className="mt-4">
+                  <p className="text-xs text-slate-500 font-bold mb-1">Don'ts</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed whitespace-pre-wrap">{donts}</p>
+                </div>
+              )}
+            </>
+          );
+        })()}
         
         {job.clientName && (
           <div className="mt-4">
@@ -218,10 +237,16 @@ export default function JobDetails() {
           <div className="text-center py-2 text-sm font-bold text-slate-500 dark:text-slate-400">
             Employers cannot apply for gigs.
           </div>
-        ) : isHired ? (
+        ) : isConfirmed ? (
           <div className="flex flex-col gap-3">
-            <Button fullWidth size="lg" disabled className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 border-emerald-200">
-              <CheckCircle size={18} className="mr-2" /> You're Hired!
+            <Button 
+              fullWidth 
+              size="lg" 
+              variant="primary"
+              onClick={() => navigate(`/worker-pipeline/${job.id}`)}
+              className="bg-emerald-500 hover:bg-emerald-600 border-emerald-500 text-white"
+            >
+              <CheckCircle size={18} className="mr-2" /> Go to Job Pipeline
             </Button>
             <Button
               fullWidth
@@ -233,6 +258,15 @@ export default function JobDetails() {
               }}
             >
               <MessageCircle size={18} className="mr-2" /> Chat with Employer
+            </Button>
+          </div>
+        ) : isPendingConfirmation ? (
+          <div className="flex flex-col gap-3">
+            <Button fullWidth size="lg" disabled className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 border-blue-200">
+              <CheckCircle size={18} className="mr-2" /> Offer Received — Confirm in Ongoing tab
+            </Button>
+            <Button fullWidth variant="outline" onClick={() => navigate('/jobs?tab=ongoing')}>
+              Go to Ongoing
             </Button>
           </div>
         ) : hasApplied ? (
@@ -296,9 +330,9 @@ export default function JobDetails() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      {c.status === 'accepted' ? (
+                      {c.status === 'hired' || c.status === 'confirmed' ? (
                         <>
-                          <Badge variant="success">Hired</Badge>
+                          <Badge variant="success">{c.status === 'confirmed' ? 'Confirmed' : 'Hired (Pending)'}</Badge>
                           <button
                             onClick={async () => {
                               const threadId = await fetchChatThreadId(job.id, c.workerId);
@@ -373,8 +407,8 @@ export default function JobDetails() {
               </div>
             </div>
 
-            <Button fullWidth size="lg" onClick={() => { handleHire(selectedCandidate.id); setSelectedCandidate(null); }} disabled={selectedCandidate.status === 'accepted' || job.workersHired >= job.workersNeeded}>
-              {selectedCandidate.status === 'accepted' ? 'Already Hired' : 'Hire this Worker'}
+            <Button fullWidth size="lg" onClick={() => { handleHire(selectedCandidate.id); setSelectedCandidate(null); }} disabled={selectedCandidate.status === 'hired' || selectedCandidate.status === 'confirmed' || job.workersHired >= job.workersNeeded}>
+              {selectedCandidate.status === 'hired' || selectedCandidate.status === 'confirmed' ? 'Already Hired' : 'Hire this Worker'}
             </Button>
           </div>
         </Modal>

@@ -21,6 +21,7 @@ export const EMPLOYER_TABS = [
   { path: '/home',     icon: Home,          label: 'Dashboard' },
   { path: '/jobs',     icon: Briefcase,     label: 'Jobs' },
   { path: '/workers',  icon: User,          label: 'Workers' },
+  { path: '/wallet',   icon: Wallet,        label: 'Wallet' },
   { path: '/chat',     icon: MessageSquare, label: 'Messages' },
   { path: '/profile',  icon: User,          label: 'Profile' },
 ];

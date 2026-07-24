@@ -40,7 +40,7 @@ export async function updateLocation(req: AuthenticatedRequest, res: Response): 
     .select('id')
     .eq('job_id', jobId)
     .eq('worker_id', workerId)
-    .eq('status', 'accepted')
+    .eq('status', 'confirmed')
     .single();
 
   if (!application) {

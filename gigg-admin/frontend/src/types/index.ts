@@ -81,7 +81,7 @@ export interface Job {
 
 // ── Applications ──────────────────────────────────────────────
 
-export type ApplicationStatus = 'applied' | 'shortlisted' | 'accepted' | 'rejected' | 'completed';
+export type ApplicationStatus = 'applied' | 'shortlisted' | 'hired' | 'confirmed' | 'rejected' | 'completed' | 'no_show';
 
 export interface Application {
   id: string;
@@ -150,6 +150,32 @@ export interface KYCDocument {
     company_name?: string;
     kyc_status?: string;
   };
+}
+
+// ── Pipeline (read-only visibility for admin) ────────────────
+
+export type TaskCompletionStatus = 'not_started' | 'in_progress' | 'submitted' | 'complete' | 'failed';
+
+export interface JobTask {
+  id: string;
+  job_id: string;
+  kind: 'opening' | 'task' | 'closing';
+  sort_order: number;
+  title: string;
+  description: string;
+  completion_type: 'image' | 'form' | 'tick';
+}
+
+export interface TaskCompletion {
+  id: string;
+  application_id: string;
+  job_task_id: string;
+  status: TaskCompletionStatus;
+}
+
+export interface JobPipeline {
+  tasks: JobTask[];
+  completionsByApplication: Record<string, TaskCompletion[]>;
 }
 
 // ── Analytics ─────────────────────────────────────────────────

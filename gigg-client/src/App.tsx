@@ -23,9 +23,15 @@ import Home from './features/home/pages/Home';
 import Jobs from './features/jobs/pages/Jobs';
 import JobDetails from './features/jobs/pages/JobDetails';
 import PostJob from './features/jobs/pages/PostJob';
+import JobEdit from './features/jobs/pages/JobEdit';
 import AssignWork from './features/jobs/pages/AssignWork';
 import PipelineManager from './features/jobs/pages/PipelineManager';
 import WorkerPipeline from './features/jobs/pages/WorkerPipeline';
+import PipelineBuilder from './features/jobs/pages/PipelineBuilder';
+import ClientInviteRedeem from './features/jobs/pages/ClientInviteRedeem';
+import ClientJobList from './features/jobs/pages/ClientJobList';
+import ClientPipelineView from './features/jobs/pages/ClientPipelineView';
+import EmployerWorkers from './features/jobs/pages/EmployerWorkers';
 
 // Profile
 import Profile from './features/profile/pages/Profile';
@@ -64,10 +70,18 @@ function App() {
           <Route path="/jobs" element={<Jobs />} />
           <Route path="/jobs/:id" element={<JobDetails />} />
           <Route path="/post-job" element={<PostJob />} />
+          <Route path="/edit-job/:jobId" element={<JobEdit />} />
           <Route path="/assign-work/:id" element={<AssignWork />} />
           <Route path="/pipeline/:jobId/:workerId" element={<PipelineManager />} />
           <Route path="/worker-pipeline/:jobId" element={<WorkerPipeline />} />
+          <Route path="/pipeline-builder/:jobId" element={<PipelineBuilder />} />
+          <Route path="/workers" element={<EmployerWorkers />} />
           <Route path="/profile" element={<Profile />} />
+
+          {/* Client (read-only, magic-link) */}
+          <Route path="/client/invite/:inviteToken" element={<ClientInviteRedeem />} />
+          <Route path="/client/jobs" element={<ClientJobList />} />
+          <Route path="/client/jobs/:jobId" element={<ClientPipelineView />} />
 
           {/* Chat */}
           <Route path="/chat" element={<ChatList />} />

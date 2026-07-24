@@ -146,6 +146,31 @@ export async function razorpayWebhook(req: Request, res: Response): Promise<void
   res.json({ received: true });
 }
 
+// GET /api/payments/wallet
+export async function getWallet(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const userId = req.user!.id;
+
+  let { data: walletRow } = await supabase
+    .from('wallets')
+    .select('balance, escrow_balance')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!walletRow) {
+    const { data: created } = await supabase
+      .from('wallets')
+      .upsert({ user_id: userId, balance: 0, escrow_balance: 0 }, { onConflict: 'user_id', ignoreDuplicates: true })
+      .select('balance, escrow_balance')
+      .maybeSingle();
+    walletRow = created ?? { balance: 0, escrow_balance: 0 };
+  }
+
+  res.json({
+    balance: Number(walletRow.balance) || 0,
+    escrowBalance: Number(walletRow.escrow_balance) || 0,
+  });
+}
+
 // GET /api/payments/history
 export async function paymentHistory(req: AuthenticatedRequest, res: Response): Promise<void> {
   const page = Number(req.query.page) || 1;

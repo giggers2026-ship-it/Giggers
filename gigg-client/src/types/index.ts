@@ -6,7 +6,7 @@ export interface UserProfile {
   name: string;
   email: string;
   phone: string;
-  role: 'worker' | 'employer';
+  role: 'worker' | 'employer' | 'client';
   avatar?: string;
   selfie?: string;
   isVerified: boolean;
@@ -41,6 +41,10 @@ export interface UserProfile {
   companyName?: string;
   companyLogo?: string;
   isVerifiedEmployer?: boolean;
+  creditPoint: number;
+  oneLiner?: string;
+  upiId?: string;
+  bankAccount?: string;
 }
 
 export interface JobCategory {
@@ -95,7 +99,7 @@ export interface Job {
 }
 
 export type JobStatus = 'draft' | 'active' | 'completed' | 'cancelled';
-export type ApplicationStatus = 'applied' | 'shortlisted' | 'accepted' | 'rejected' | 'completed' | 'hired';
+export type ApplicationStatus = 'applied' | 'shortlisted' | 'hired' | 'confirmed' | 'rejected' | 'completed' | 'no_show';
 
 export interface Application {
   id: string;
@@ -109,6 +113,8 @@ export interface Application {
   status: ApplicationStatus;
   appliedAt: string;
   updatedAt: string;
+  // Legacy fixed-step pipeline fields — superseded by job_tasks/application_task_completions,
+  // kept during the coexistence period (see PIPELINE_MIGRATION.sql) until old jobs are migrated.
   reportingCompleted?: boolean;
   selfieCompleted?: boolean;
   tshirtCompleted?: boolean;
@@ -156,10 +162,74 @@ export interface ChatMessage {
   imageUrl?: string;
   fileUrl?: string;
   fileName?: string;
-  type: 'text' | 'image' | 'file' | 'voice';
+  type: 'text' | 'image' | 'file' | 'voice' | 'video';
   sentAt: string;
   isRead: boolean;
   duration?: number;
+  videoUrl?: string;
+  jobTaskId?: string;
+}
+
+export type TaskKind = 'opening' | 'task' | 'closing';
+export type TaskCompletionType = 'image' | 'form' | 'tick';
+export type TaskCompletionStatus = 'not_started' | 'in_progress' | 'submitted' | 'complete' | 'failed';
+
+export interface FormField {
+  label: string;
+  type: 'text' | 'number' | 'select';
+  options?: string[];
+}
+
+export interface JobTask {
+  id: string;
+  jobId: string;
+  kind: TaskKind;
+  sortOrder: number;
+  title: string;
+  description: string;
+  completionType: TaskCompletionType;
+  formSchema?: FormField[];
+  responseWindowMinutes: number;
+  autoFailMinutes: number;
+  /** Minutes before/after the anchor time (job reporting_time for opening,
+   * job end_time for closing, or this task's own anchorTime for a middle
+   * task) that the task's clock window opens/closes. Only used when the
+   * task is clock-anchored — see anchorTime. */
+  openMinutesBefore: number;
+  openMinutesAfter: number;
+  /** 'HH:MM' clock time a middle task is anchored to (employer-set,
+   * optional). Opening/closing tasks ignore this — they always anchor to
+   * the job's reporting_time/end_time. Undefined means the middle task
+   * keeps the relative-timer behavior instead of a clock window. */
+  anchorTime?: string;
+  requiresReview: boolean;
+}
+
+export interface TaskCompletion {
+  id: string;
+  applicationId: string;
+  jobTaskId: string;
+  status: TaskCompletionStatus;
+  imageUrl?: string;
+  formData?: Record<string, string | number>;
+  availableAt?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+  /** Set only for opening/closing (clock-anchored) tasks — the job-clock-derived open/deadline instants. */
+  opensAt?: string;
+  deadlineAt?: string;
+}
+
+export interface JobClient {
+  id: string;
+  jobId: string;
+  employerId: string;
+  name: string;
+  phone: string;
+  inviteToken?: string;
+  invitedAt: string;
+  lastViewedAt?: string;
 }
 
 export interface Transaction {

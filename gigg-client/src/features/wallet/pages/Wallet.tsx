@@ -35,6 +35,11 @@ export default function Wallet() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [paying, setPaying] = useState(false);
+  const [showBankModal, setShowBankModal] = useState(false);
+  const [upiId, setUpiId] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [savingBank, setSavingBank] = useState(false);
+  const { updateProfile } = useAuthStore();
 
   useEffect(() => {
     if (user) fetchWallet();
@@ -66,6 +71,25 @@ export default function Wallet() {
     }
   };
 
+  const handleOpenBankModal = () => {
+    setUpiId(user?.upiId || '');
+    setBankAccount(user?.bankAccount || '');
+    setShowBankModal(true);
+  };
+
+  const handleSaveBankDetails = async () => {
+    setSavingBank(true);
+    try {
+      await updateProfile({ upiId: upiId.trim() || undefined, bankAccount: bankAccount.trim() || undefined });
+      addToast('Payout details saved', 'success');
+      setShowBankModal(false);
+    } catch {
+      addToast('Failed to save payout details', 'error');
+    } finally {
+      setSavingBank(false);
+    }
+  };
+
   if (!user) return null;
 
   const balance = wallet?.currentBalance ?? 0;
@@ -93,18 +117,26 @@ export default function Wallet() {
         </div>
 
         {/* Linked Account Info */}
-        <div className="bg-white dark:bg-dark-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-dark-600 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-slate-100 dark:bg-dark-600 rounded-xl flex items-center justify-center text-slate-500">
-              <Landmark size={20} />
+        {user.role === 'worker' && (
+          <div className="bg-white dark:bg-dark-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-dark-600 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-slate-100 dark:bg-dark-600 rounded-xl flex items-center justify-center text-slate-500">
+                <Landmark size={20} />
+              </div>
+              <div>
+                <p className="font-extrabold text-sm text-slate-900 dark:text-white">
+                  {user.upiId || user.bankAccount ? 'Payout Details' : 'Linked Bank Account'}
+                </p>
+                <p className="text-xs font-semibold text-slate-400">
+                  {user.upiId ? user.upiId : user.bankAccount ? `A/c ending ${user.bankAccount.slice(-4)}` : 'Add your account for withdrawals'}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-extrabold text-sm text-slate-900 dark:text-white">Linked Bank Account</p>
-              <p className="text-xs font-semibold text-slate-400">Add your account for withdrawals</p>
-            </div>
+            <button onClick={handleOpenBankModal} className="text-xs font-bold text-primary-600 dark:text-primary-400">
+              {user.upiId || user.bankAccount ? 'Edit' : 'Setup'}
+            </button>
           </div>
-          <button className="text-xs font-bold text-primary-600 dark:text-primary-400">Setup</button>
-        </div>
+        )}
 
         {/* Transactions */}
         <div>
@@ -186,6 +218,27 @@ export default function Wallet() {
           <p className="text-center text-[10px] text-slate-400 mt-3 font-semibold flex items-center justify-center gap-1">
             <Shield size={12} /> Test Payment Mode Enabled
           </p>
+        </div>
+      </Modal>
+
+      {/* Payout Details Modal (worker only) */}
+      <Modal open={showBankModal} onClose={() => setShowBankModal(false)} title="Payout Details">
+        <div className="py-2 flex flex-col gap-4">
+          <Input
+            label="UPI ID"
+            placeholder="yourname@bank"
+            value={upiId}
+            onChange={e => setUpiId(e.target.value)}
+          />
+          <Input
+            label="Bank Account Number"
+            placeholder="Optional, if no UPI"
+            value={bankAccount}
+            onChange={e => setBankAccount(e.target.value)}
+          />
+          <Button fullWidth size="lg" onClick={handleSaveBankDetails} loading={savingBank}>
+            Save Payout Details
+          </Button>
         </div>
       </Modal>
     </div>

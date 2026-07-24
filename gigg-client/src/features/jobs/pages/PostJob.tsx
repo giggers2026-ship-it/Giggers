@@ -2,13 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../../../components/layout/Navigation';
-import { Button, Input, Select, Toggle, Textarea } from '../../../components/ui';
+import { Button } from '../../../components/ui';
 import { useJobStore } from '../../../store/jobStore';
 import { useWalletStore } from '../../../store/walletStore';
 import { useUIStore } from '../../../store/uiStore';
 import { useAuthStore } from '../../../store/authStore';
-import { Info, MapPin, Calculator, Wallet, Shield, ShieldAlert } from 'lucide-react';
+import { Calculator, Wallet, Shield, ShieldAlert } from 'lucide-react';
 import { Modal } from '../../../components/ui';
+import { JobFormSteps, type JobFormState, type JobFormSetters } from '../components/JobFormSteps';
+import { parseDosAndDonts } from '../constants';
+
+const STEP_TITLES: Record<number, string> = {
+  1: 'Job Details',
+  2: 'Time & Location',
+  3: 'Requirements',
+  4: 'Review & Confirm',
+};
+
+const REVIEW_FIELDS: { label: string; key: keyof JobFormState }[] = [
+  { label: 'Title', key: 'title' },
+  { label: 'Category', key: 'category' },
+  { label: 'Nature of Work', key: 'natureOfWork' },
+  { label: 'Client Name', key: 'clientName' },
+  { label: 'Client ID', key: 'clientId' },
+  { label: 'Workers Needed', key: 'workersNeeded' },
+  { label: 'Pay per Worker', key: 'payPerWorker' },
+  { label: 'Date', key: 'date' },
+  { label: 'Reporting Time', key: 'reportingTime' },
+  { label: 'End Time', key: 'endTime' },
+  { label: 'Location', key: 'location' },
+  { label: 'Address', key: 'address' },
+  { label: 'Description', key: 'description' },
+  { label: 'Mode of Payment', key: 'modeOfPayment' },
+  { label: 'Payment Date', key: 'paymentDate' },
+  { label: 'Dress Code', key: 'dressCode' },
+  { label: 'Gender Preference', key: 'gender' },
+];
 
 export default function PostJob() {
   const navigate = useNavigate();
@@ -48,23 +77,22 @@ export default function PostJob() {
   const [modeOfPayment, setModeOfPayment] = useState('Online');
   const [paymentDate, setPaymentDate] = useState('');
   const [dosAndDonts, setDosAndDonts] = useState('');
-  // Category-specific hints
-  const categoryHint = category === 'Catering'
-    ? 'e.g. Wedding servers, buffet waitstaff, banquet crew'
-    : category === 'Pamphlet Dist.'
-    ? 'e.g. Flyer team, area distributors, ground deployment'
-    : '';
 
-  const handleCategoryChange = (val: string) => {
-    setCategory(val);
-    // Auto-set sensible dress code defaults
-    if (val === 'Catering') setDressCode('Formal (White shirt, Black trousers)');
-    if (val === 'Pamphlet Dist.') setDressCode('Casual');
+  const formState: JobFormState = {
+    title, category, workersNeeded, payPerWorker, date, reportingTime, endTime,
+    location, address, description, food, dressCode, gender, natureOfWork,
+    clientName, clientId, needLocationBasedWorkers, modeOfPayment, paymentDate, dosAndDonts,
+  };
+  const formSetters: JobFormSetters = {
+    setTitle, setCategory, setWorkersNeeded, setPayPerWorker, setDate, setReportingTime, setEndTime,
+    setLocation, setAddress, setDescription, setFood, setDressCode, setGender, setNatureOfWork,
+    setClientName, setClientId, setNeedLocationBasedWorkers, setModeOfPayment, setPaymentDate, setDosAndDonts,
   };
 
   const totalCost = workersNeeded * (Number(payPerWorker) || 0);
   const platformFee = totalCost * 0.10;
   const totalPayable = totalCost + platformFee;
+
   const handleNext = () => {
     if (step === 1 && (!title || !category || !workersNeeded || !payPerWorker)) {
       addToast('Please fill essential details', 'error'); return;
@@ -72,13 +100,14 @@ export default function PostJob() {
     if (step === 2 && (!date || !reportingTime || !location)) {
       addToast('Please fill time & location details', 'error'); return;
     }
-    if (step < 3) setStep(s => s + 1);
+    if (step === 3 && !description) {
+      addToast('Please add a description', 'error'); return;
+    }
+    if (step < 4) setStep(s => s + 1);
     else handleSubmit();
   };
 
   const handleSubmit = async () => {
-    if (!description) { addToast('Please add a description', 'error'); return; }
-    
     // Escrow Check
     const currentBalance = wallet?.currentBalance || 0;
     if (currentBalance < totalPayable) {
@@ -91,16 +120,22 @@ export default function PostJob() {
 
   const executePostJob = async () => {
     if (!user) return;
-    await postJob({
-      title, category, workersNeeded, payPerWorker: Number(payPerWorker),
-      date, reportingTime, endTime, location, address, description,
-      foodProvided: food, dressCode, genderPreference: gender as any,
-      needLocationBasedWorkers, natureOfWork, clientName, clientId,
-      modeOfPayment: modeOfPayment as any, paymentDate, dosAndDonts
-    }, user.id);
-    await fetchWallet();
-    addToast('Job posted & funds held in escrow! 🎉', 'success');
-    navigate('/jobs?tab=postings');
+    let newJobId: string;
+    try {
+      newJobId = await postJob({
+        title, category, workersNeeded, payPerWorker: Number(payPerWorker),
+        date, reportingTime, endTime, location, address, description,
+        foodProvided: food, dressCode, genderPreference: gender as any,
+        needLocationBasedWorkers, natureOfWork, clientName, clientId,
+        modeOfPayment: modeOfPayment as any, paymentDate, dosAndDonts
+      }, user.id);
+    } catch (err: any) {
+      addToast(err?.message || 'Failed to post job. Please try again.', 'error');
+      return;
+    }
+    fetchWallet().catch(() => {});
+    addToast('Job posted! Now set up the work pipeline.', 'success');
+    navigate(`/pipeline-builder/${newJobId}`);
   };
 
   const handleAddFunds = () => {
@@ -134,59 +169,25 @@ export default function PostJob() {
 
   return (
     <div className="pb-24 font-sans bg-slate-50 dark:bg-dark-900 min-h-screen">
-      <AppHeader title={step === 1 ? 'Job Details' : step === 2 ? 'Time & Location' : 'Requirements'} showBack onBack={() => step > 1 ? setStep(s => s - 1) : navigate(-1)} />
+      <AppHeader title={STEP_TITLES[step]} showBack onBack={() => step > 1 ? setStep(s => s - 1) : navigate(-1)} />
 
       <div className="bg-white dark:bg-dark-800 px-5 pt-4 pb-6 shadow-sm mb-4">
         <div className="flex gap-1.5 mb-2">
-          {[1,2,3].map(i => (
+          {[1,2,3,4].map(i => (
             <div key={i} className={`h-1.5 rounded-full flex-1 transition-all ${i <= step ? 'bg-primary-500' : 'bg-slate-100 dark:bg-dark-600'}`} />
           ))}
         </div>
-        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Step {step} of 3</p>
+        <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Step {step} of 4</p>
       </div>
 
       <div className="px-5">
         <AnimatePresence mode="wait">
           <motion.div key={step} initial={{ x: 20, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -20, opacity: 0 }} transition={{ duration: 0.2 }} className="flex flex-col gap-5">
-            
-            {step === 1 && (
+
+            {step <= 3 && <JobFormSteps step={step as 1 | 2 | 3} state={formState} setters={formSetters} />}
+
+            {step === 4 && (
               <>
-                <Input label="Job Title *" placeholder={category ? categoryHint : 'e.g. Wedding Catering Staff'} value={title} onChange={e => setTitle(e.target.value)} />
-                <Input label="Nature of work *" placeholder="e.g. Serving food to guests" value={natureOfWork} onChange={e => setNatureOfWork(e.target.value)} />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Client Name" placeholder="e.g. Rajesh Kumar" value={clientName} onChange={e => setClientName(e.target.value)} />
-                  <Input label="Client ID" placeholder="e.g. CLI-9021" value={clientId} onChange={e => setClientId(e.target.value)} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Category *</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {['Catering', 'Pamphlet Dist.'].map(cat => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => handleCategoryChange(cat)}
-                        className={`flex items-center gap-2 px-3 py-3 rounded-xl border-2 font-bold text-sm transition-all ${
-                          category === cat
-                            ? cat === 'Catering'
-                              ? 'bg-amber-50 border-amber-400 text-amber-800 dark:bg-amber-900/20 dark:border-amber-500 dark:text-amber-300'
-                              : 'bg-emerald-50 border-emerald-500 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-500 dark:text-emerald-300'
-                            : 'border-slate-200 dark:border-dark-500 text-slate-600 dark:text-slate-400 hover:border-slate-300'
-                        }`}
-                      >
-                        <span className="text-lg">{cat === 'Catering' ? '👨‍🍳' : '📄'}</span>
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                  {categoryHint && (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium pl-1">{categoryHint}</p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Workers Needed *" type="number" min="1" value={workersNeeded} onChange={e => setWorkersNeeded(Number(e.target.value))} />
-                  <Input label="Pay per Worker (₹) *" type="number" placeholder="500" value={payPerWorker} onChange={e => setPayPerWorker(e.target.value)} />
-                </div>
-                
                 <div className="bg-primary-50 dark:bg-primary-900/10 rounded-2xl p-4 border border-primary-100 dark:border-primary-900/30">
                   <div className="flex items-center gap-2 mb-2 text-primary-700 dark:text-primary-400 font-bold text-sm">
                     <Calculator size={16} /> Estimated Cost
@@ -205,50 +206,37 @@ export default function PostJob() {
                     <span className="text-lg text-primary-600 dark:text-primary-400">₹{totalPayable}</span>
                   </div>
                 </div>
-              </>
-            )}
 
-            {step === 2 && (
-              <>
-                <Input label="Date *" type="date" value={date} onChange={e => setDate(e.target.value)} />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="Reporting Time *" type="time" value={reportingTime} onChange={e => setReportingTime(e.target.value)} />
-                  <Input label="End Time" type="time" value={endTime} onChange={e => setEndTime(e.target.value)} />
-                </div>
-                <Input label="City/Area *" placeholder="e.g. Bandra West, Mumbai" value={location} onChange={e => setLocation(e.target.value)} leftIcon={<MapPin size={16} />} />
-                <Textarea label="Complete Address" placeholder="Full venue address" rows={3} value={address} onChange={e => setAddress(e.target.value)} />
-                <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-dark-600 mt-2">
-                  <Toggle checked={needLocationBasedWorkers} onChange={setNeedLocationBasedWorkers} label="Need Location based workers?" />
-                </div>
-              </>
-            )}
-
-            {step === 3 && (
-              <>
-                <Textarea label="Job Description *" placeholder="Detail what the workers need to do..." rows={5} value={description} onChange={e => setDescription(e.target.value)} />
-                <Textarea label="Do's & Don'ts" placeholder="e.g. Do arrive 15 mins early. Don't use phones during service." rows={3} value={dosAndDonts} onChange={e => setDosAndDonts(e.target.value)} />
-                <Select label="Mode of Payment" value={modeOfPayment} onChange={e => setModeOfPayment(e.target.value)} options={[
-                  { value: 'Online', label: 'Online' },
-                  { value: 'Cash', label: 'Cash' },
-                  { value: 'Wallet', label: 'Wallet' },
-                ]} />
-                <Input label="Payment Date" type="date" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
-                <Select label="Dress Code" value={dressCode} onChange={e => setDressCode(e.target.value)} options={[
-                  { value: 'Casual', label: 'Casual' },
-                  { value: 'Formal (Black & White)', label: 'Formal (Black & White)' },
-                  { value: 'Uniform Provided', label: 'Uniform Provided at venue' },
-                ]} />
-                <Select label="Gender Preference" value={gender} onChange={e => setGender(e.target.value)} options={[
-                  { value: 'any', label: 'Any' },
-                  { value: 'male', label: 'Male Only' },
-                  { value: 'female', label: 'Female Only' },
-                ]} />
-                <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-dark-600">
-                  <Toggle checked={food} onChange={setFood} label="Food provided at venue" />
-                </div>
-                <div className="flex gap-3 p-4 bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-100 dark:border-amber-800/30">
-                  <Info size={20} className="text-amber-600 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs font-medium text-amber-800 dark:text-amber-400">Payment will be held in escrow and released to workers only after successful completion verified via OTP.</p>
+                <div className="flex flex-col gap-2">
+                  {REVIEW_FIELDS.map(({ label, key }) => {
+                    const value = formState[key];
+                    if (value === '' || value === undefined) return null;
+                    return (
+                      <div key={key} className="bg-slate-50 dark:bg-dark-700 p-3 rounded-xl flex justify-between items-center gap-3">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">{label}</span>
+                        <span className="text-xs font-semibold text-slate-900 dark:text-white text-right">{String(value)}</span>
+                      </div>
+                    );
+                  })}
+                  {(() => {
+                    const { dos, donts } = parseDosAndDonts(formState.dosAndDonts);
+                    return (
+                      <>
+                        {dos && (
+                          <div className="bg-slate-50 dark:bg-dark-700 p-3 rounded-xl flex justify-between items-start gap-3">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">Do's</span>
+                            <span className="text-xs font-semibold text-slate-900 dark:text-white text-right whitespace-pre-wrap">{dos}</span>
+                          </div>
+                        )}
+                        {donts && (
+                          <div className="bg-slate-50 dark:bg-dark-700 p-3 rounded-xl flex justify-between items-start gap-3">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex-shrink-0">Don'ts</span>
+                            <span className="text-xs font-semibold text-slate-900 dark:text-white text-right whitespace-pre-wrap">{donts}</span>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
               </>
             )}
@@ -264,14 +252,14 @@ export default function PostJob() {
             <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400">KYC Verification required to post jobs. Go to Profile to verify.</p>
           </div>
         )}
-        <Button 
-          fullWidth 
-          size="lg" 
-          loading={isJobLoading} 
+        <Button
+          fullWidth
+          size="lg"
+          loading={isJobLoading}
           onClick={handleNext}
           disabled={!user?.isVerified}
         >
-          {step < 3 ? 'Continue' : 'Post Job'}
+          {step < 4 ? 'Continue' : 'Confirm & Post Job'}
         </Button>
       </div>
 

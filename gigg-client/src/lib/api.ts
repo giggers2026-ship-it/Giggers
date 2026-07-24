@@ -2,7 +2,10 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 function getToken(): string | null {
   try {
-    const raw = localStorage.getItem('giggers-auth');
+    // Must match authStore's persist storage (sessionStorage) — each tab
+    // keeps its own session, so the token has to come from the same
+    // per-tab store the auth state itself lives in.
+    const raw = sessionStorage.getItem('giggers-auth');
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed?.state?.token || null;
