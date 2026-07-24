@@ -1,0 +1,21 @@
+{
+  "short_name": "Giggers",
+  "name": "Giggers – Hire Trusted Workers Instantly",
+  "description": "Chennai's #1 platform to hire verified temporary workers for catering, events, delivery, housekeeping and more.",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/home",
+  "background_color": "#01133b",
+  "theme_color": "#01133b",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
+  "lang": "en-IN",
+  "scope": "/"
+}
