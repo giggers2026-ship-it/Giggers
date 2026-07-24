@@ -1,16 +1,25 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { AppHeader } from '../../../components/layout/Navigation';
 import { useNotificationStore } from '../../../store/notificationStore';
 import { useAuthStore } from '../../../store/authStore';
-import { Bell, Briefcase, Wallet, Star } from 'lucide-react';
-import { EmptyState } from '../../../components/ui';
+import { Bell, Briefcase, Wallet, Star, BellRing, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { EmptyState, Button } from '../../../components/ui';
+import { getNotificationPermissionState, subscribeToWebPush, sendTestPush } from '../../../lib/pushNotifications';
 
 export default function Notifications() {
   const navigate = useNavigate();
   const { notifications, fetchNotifications, markAllAsRead, isLoading } = useNotificationStore();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
+
+  const [permissionState, setPermissionState] = useState<NotificationPermission | 'unsupported'>('default');
+  const [subscribing, setSubscribing] = useState(false);
+  const [pushStatusMsg, setPushStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    setPermissionState(getNotificationPermissionState());
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -18,6 +27,24 @@ export default function Notifications() {
       return () => { markAllAsRead(user.id); };
     }
   }, [user?.id, fetchNotifications, markAllAsRead]);
+
+  const handleEnablePush = async () => {
+    if (!token) return;
+    setSubscribing(true);
+    setPushStatusMsg(null);
+
+    const res = await subscribeToWebPush(token);
+    setSubscribing(false);
+    setPermissionState(getNotificationPermissionState());
+
+    if (res.success) {
+      setPushStatusMsg({ type: 'success', text: 'Live push notifications enabled!' });
+      // Send a test push
+      await sendTestPush(token);
+    } else {
+      setPushStatusMsg({ type: 'error', text: res.message || 'Failed to enable push notifications.' });
+    }
+  };
 
   const getIcon = (type: string) => {
     if (type.includes('payment') || type.includes('earning')) return <Wallet size={18} />;
@@ -37,7 +64,54 @@ export default function Notifications() {
     <div className="pb-24 font-sans">
       <AppHeader title="Notifications" showBack onBack={() => navigate(-1)} rightAction={<button onClick={() => user && markAllAsRead(user.id)} className="text-xs font-bold text-primary-600 dark:text-primary-400">Mark all read</button>} />
 
-      <div className="px-5 pt-4 flex flex-col gap-3">
+      <div className="px-5 pt-4 flex flex-col gap-4">
+        {/* Push Notification Opt-in Card */}
+        {permissionState !== 'granted' && permissionState !== 'unsupported' && (
+          <div className="bg-gradient-to-br from-primary-600 to-indigo-700 rounded-3xl p-5 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 opacity-10 pointer-events-none">
+              <BellRing size={140} />
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center flex-shrink-0 text-white shadow-inner">
+                <BellRing size={22} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-extrabold text-base leading-tight">Get Live Job & Payment Alerts</h3>
+                <p className="text-xs text-primary-100 mt-1 font-medium leading-relaxed">
+                  Turn on browser notifications so you never miss a new gig in Chennai or an instant payout.
+                </p>
+                <div className="mt-4 flex items-center gap-3">
+                  <button
+                    onClick={handleEnablePush}
+                    disabled={subscribing}
+                    className="bg-white text-primary-700 px-4 py-2.5 rounded-xl font-bold text-xs shadow-md hover:bg-slate-50 transition-all flex items-center gap-2 disabled:opacity-70"
+                  >
+                    {subscribing ? <Loader2 size={14} className="animate-spin" /> : <BellRing size={14} />}
+                    {subscribing ? 'Enabling...' : 'Enable Push Alerts'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {permissionState === 'granted' && (
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl p-3.5 flex items-center gap-3">
+            <CheckCircle2 size={18} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex-1">
+              Browser push notifications are active for live gig alerts.
+            </p>
+          </div>
+        )}
+
+        {pushStatusMsg && (
+          <div className={`p-3 rounded-xl text-xs font-semibold flex items-center gap-2 ${pushStatusMsg.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+            {pushStatusMsg.type === 'success' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
+            {pushStatusMsg.text}
+          </div>
+        )}
+
+        {/* Notifications List */}
         {isLoading ? (
           <div className="text-center py-10 text-slate-400">Loading...</div>
         ) : notifications.length > 0 ? (

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, UserX, UserCheck, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
+import { Search, Filter, UserX, ChevronDown, CheckCircle, XCircle } from 'lucide-react';
 import { Header } from '../components/Header';
 import { DataTable, Column } from '../components/DataTable';
 import apiClient from '../api/client';
@@ -74,11 +74,7 @@ const Users: React.FC = () => {
     fetchUsers();
   };
 
-  const handleVerify = async (e: React.MouseEvent, user: Profile) => {
-    e.stopPropagation();
-    await apiClient.patch(`/users/${user.id}`, { is_verified: !user.is_verified });
-    fetchUsers();
-  };
+
 
   const columns: Column<Profile>[] = [
     {
@@ -156,15 +152,7 @@ const Users: React.FC = () => {
               </button>
             </>
           )}
-          {row.is_approved && (
-            <button
-              onClick={(e) => handleVerify(e, row)}
-              className={`btn-${row.is_verified ? 'secondary' : 'success'} py-1.5 px-2.5 text-xs`}
-            >
-              <UserCheck size={11} />
-              {row.is_verified ? 'Revoke KYC' : 'Verify KYC'}
-            </button>
-          )}
+
           <button
             onClick={(e) => handleBan(e, row)}
             className="btn-danger py-1.5 px-2.5 text-xs"
