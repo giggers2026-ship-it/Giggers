@@ -1,7 +1,26 @@
 import { Response } from 'express';
 import { z } from 'zod';
-import { placesAutocomplete, getPlaceDetails } from '../services/maps.service';
+import { placesAutocomplete, getPlaceDetails, reverseGeocode } from '../services/maps.service';
 import { AuthenticatedRequest } from '../types';
+
+// GET /api/maps/reverse-geocode?lat=...&lng=...
+export async function reverseGeocodeHandler(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const result = z.object({ lat: z.string(), lng: z.string() }).safeParse(req.query);
+  if (!result.success) {
+    res.status(400).json({ error: 'lat and lng are required' });
+    return;
+  }
+  
+  try {
+    const lat = parseFloat(result.data.lat);
+    const lng = parseFloat(result.data.lng);
+    const details = await reverseGeocode(lat, lng);
+    res.json(details);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+}
+
 
 // GET /api/maps/autocomplete?input=...&session=...
 export async function autocomplete(req: AuthenticatedRequest, res: Response): Promise<void> {

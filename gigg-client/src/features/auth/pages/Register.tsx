@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, User, Phone, MapPin, Briefcase } from 'lucide-re
 import { useUIStore } from '../../../store/uiStore';
 import { useAuthStore } from '../../../store/authStore';
 import { Button, Input } from '../../../components/ui';
+import { InteractiveLocationPicker } from '../components/InteractiveLocationPicker';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export default function Register() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState(initialPhone);
   const [companyName, setCompanyName] = useState('');
-  const [city, setCity] = useState('Mumbai');
+  const [city, setCity] = useState('Chennai');
   const [area, setArea] = useState('');
 
   const totalSteps = 2;
@@ -120,10 +121,14 @@ export default function Register() {
 
             {step === 2 && (
               <>
-                <div className="grid grid-cols-2 gap-3">
-                  <Input label="City" placeholder="Mumbai" value={city} onChange={e => setCity(e.target.value)} leftIcon={<MapPin size={16} />} />
-                  <Input label="Area" placeholder="Andheri" value={area} onChange={e => setArea(e.target.value)} />
-                </div>
+                <InteractiveLocationPicker 
+                  city={city} 
+                  area={area} 
+                  onChange={(data) => {
+                    setCity(data.city);
+                    setArea(data.area);
+                  }}
+                />
                 <div className="bg-primary-50 dark:bg-primary-900/10 rounded-2xl p-4 mt-4 border border-primary-100 dark:border-primary-800/30">
                   <p className="text-xs font-bold text-primary-700 dark:text-primary-400 flex items-center gap-2">📲 Phone Verification</p>
                   <p className="text-xs text-primary-600 dark:text-primary-500 mt-1 font-medium">We'll send a 4-digit OTP to <span className="font-extrabold">{phone}</span> to verify your number.</p>
