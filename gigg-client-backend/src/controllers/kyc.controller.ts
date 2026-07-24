@@ -141,7 +141,7 @@ export async function submitKycHandler(req: AuthenticatedRequest, res: Response)
 
   const kycPayload = {
     user_id: userId,
-    type: 'identity',
+    type: 'other',
     status: 'pending',
     full_name: name,
     city,
