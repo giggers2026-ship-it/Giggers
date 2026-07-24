@@ -1,12 +1,18 @@
 import webpush from 'web-push';
 import { supabase } from '../utils/supabase';
 
-const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@giggers.in';
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY?.trim();
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY?.trim();
+const vapidSubject = (process.env.VAPID_SUBJECT || 'mailto:admin@giggers.in').trim();
 
+let vapidConfigured = false;
 if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  try {
+    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    vapidConfigured = true;
+  } catch (err: any) {
+    console.error('Invalid VAPID keys, push notifications disabled:', err.message);
+  }
 }
 
 export interface PushSubscriptionInput {
@@ -62,7 +68,7 @@ export async function removePushSubscription(endpoint: string): Promise<boolean>
 
 // Send push notification to a specific user across all their registered devices
 export async function sendUserPushNotification(userId: string, payload: PushPayload): Promise<number> {
-  if (!vapidPublicKey || !vapidPrivateKey) {
+  if (!vapidConfigured) {
     console.warn('VAPID keys not configured. Skipping push notification.');
     return 0;
   }
@@ -113,7 +119,7 @@ export async function sendUserPushNotification(userId: string, payload: PushPayl
 
 // Broadcast new job alert to workers in matching location
 export async function broadcastNewJobPush(city: string, jobTitle: string, jobId: string): Promise<number> {
-  if (!vapidPublicKey || !vapidPrivateKey) return 0;
+  if (!vapidConfigured) return 0;
 
   // Find worker profiles in matching city
   const { data: profiles } = await supabase

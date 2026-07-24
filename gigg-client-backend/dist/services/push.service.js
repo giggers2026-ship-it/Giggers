@@ -9,11 +9,18 @@ exports.sendUserPushNotification = sendUserPushNotification;
 exports.broadcastNewJobPush = broadcastNewJobPush;
 const web_push_1 = __importDefault(require("web-push"));
 const supabase_1 = require("../utils/supabase");
-const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-const vapidSubject = process.env.VAPID_SUBJECT || 'mailto:admin@giggers.in';
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY?.trim();
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY?.trim();
+const vapidSubject = (process.env.VAPID_SUBJECT || 'mailto:admin@giggers.in').trim();
+let vapidConfigured = false;
 if (vapidPublicKey && vapidPrivateKey) {
-    web_push_1.default.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+    try {
+        web_push_1.default.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+        vapidConfigured = true;
+    }
+    catch (err) {
+        console.error('Invalid VAPID keys, push notifications disabled:', err.message);
+    }
 }
 // Save or update user push subscription
 async function savePushSubscription(userId, subscription, userAgent) {
@@ -43,7 +50,7 @@ async function removePushSubscription(endpoint) {
 }
 // Send push notification to a specific user across all their registered devices
 async function sendUserPushNotification(userId, payload) {
-    if (!vapidPublicKey || !vapidPrivateKey) {
+    if (!vapidConfigured) {
         console.warn('VAPID keys not configured. Skipping push notification.');
         return 0;
     }
@@ -88,7 +95,7 @@ async function sendUserPushNotification(userId, payload) {
 }
 // Broadcast new job alert to workers in matching location
 async function broadcastNewJobPush(city, jobTitle, jobId) {
-    if (!vapidPublicKey || !vapidPrivateKey)
+    if (!vapidConfigured)
         return 0;
     // Find worker profiles in matching city
     const { data: profiles } = await supabase_1.supabase
