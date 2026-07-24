@@ -46,9 +46,12 @@ import Wallet from './features/wallet/pages/Wallet';
 // Notifications
 import Notifications from './features/notifications/pages/Notifications';
 
+import { PageSeo } from './components/shared/PageSeo';
+
 function App() {
   return (
     <BrowserRouter>
+      <PageSeo />
       <Routes>
         {/* Public — full-screen, outside AppShell */}
         <Route path="/" element={<Landing />} />
