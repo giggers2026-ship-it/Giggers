@@ -1,5 +1,5 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'https://gigg-client-backend.onrender.com';
+const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || 'BLML1FxYmg6NpFlEcW6XmZ1pj7cMMmNcVvxyb8y1x4GA2XAA0qhZhXBrtirDl2EO2x98vVpDFVoRJsRkGT9XuwE';
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
