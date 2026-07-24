@@ -1,8 +1,6 @@
 {
-  "rewrites": [
-    {
-      "source": "/((?!google|robots|sitemap|manifest|og-image|logo|sw).*)",
-      "destination": "/index.html"
-    }
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
